@@ -201,11 +201,12 @@ function spurgeonView(){
   if(state.spState==="loading"){
     body='<div class="loading"><i></i>OPENING SPURGEON</div>';
   } else if(state.spState==="error"){
-    body='<div class="empty"><h4>COULDN\'T REACH THE LIBRARY</h4>'+
-      '<p>This reads live from the Christian Classics Ethereal Library, which needs a deployed '+
-      'site with the proxy function in place — plain static hosting alone can\'t make this '+
-      'particular request (see the README for what that means for your host).</p>'+
-      '<a class="cta ghost" style="max-width:260px;margin:16px auto 0" target="_blank" rel="noopener" href="'+
+    body='<div class="empty"><h4>COULDN\'T LOAD SPURGEON</h4>'+
+      '<p>The app could not download or open the Morning and Evening reading. '+
+      'Check your connection and try again. Once the public-domain collection loads successfully, '+
+      'it is saved on this device for offline reading.</p>'+
+      '<button class="cta" style="max-width:260px;margin:16px auto 0" data-spretry="1">TRY AGAIN</button>'+
+      '<a class="cta ghost" style="max-width:260px;margin:10px auto 0" target="_blank" rel="noopener" href="'+
         SPURGEON.sourceUrl(mo,dy,state.spHalf)+'">OPEN IT ON CCEL</a></div>';
   } else if(state.spData){
     var s=state.spData;
@@ -244,18 +245,99 @@ function spurgeonView(){
     body+'</div>';
 }
 
+var spurgeonDataset=null;
+var SPURGEON_STORE_KEY="spurgeon:data:v1";
+
+function fetchSpurgeonDataset(){
+  return fetch(SPURGEON.datasetUrl,{cache:"force-cache"})
+    .then(function(r){
+      if(!r.ok) throw new Error("Spurgeon data HTTP "+r.status);
+      return r.json();
+    })
+    .then(function(data){
+      if(!Array.isArray(data) || data.length < 700) throw new Error("Spurgeon data incomplete");
+      spurgeonDataset=data;
+      // The book is static public-domain content. Cache it once so the
+      // devotional continues to work offline and does not redownload.
+      if(window.store && store.set) store.set(SPURGEON_STORE_KEY,data).catch(function(){});
+      return data;
+    });
+}
+
+function getSpurgeonDataset(){
+  if(spurgeonDataset) return Promise.resolve(spurgeonDataset);
+
+  if(!window.store || !store.get) return fetchSpurgeonDataset();
+  return store.get(SPURGEON_STORE_KEY)
+    .then(function(cached){
+      if(Array.isArray(cached) && cached.length >= 700){
+        spurgeonDataset=cached;
+        return cached;
+      }
+      return fetchSpurgeonDataset();
+    })
+    .catch(function(){ return fetchSpurgeonDataset(); });
+}
+
+function normalizeSpurgeonEntry(entry){
+  var kv=String(entry && entry.keyverse || "").replace(/\u2009/g," ").replace(/\s+/g," ").trim();
+  var verse=kv, ref="";
+  var km=kv.match(/^[“"]?(.*?)[”"]?\s+[—–-]\s*(.+?)\.?$/);
+  if(km){ verse=km[1].trim(); ref=km[2].trim(); }
+  verse=verse.replace(/^[“"]|[”"]$/g,"").trim();
+
+  var raw=String(entry && entry.body || "").replace(/\r/g,"").trim();
+  var lines=raw.split("\n");
+  // The dataset repeats a date heading and key verse before the actual body.
+  if(lines.length && /(?:Morning|Evening) Reading\s*$/i.test(lines[0].trim())) lines.shift();
+  while(lines.length && !lines[0].trim()) lines.shift();
+  if(lines.length){
+    var first=lines[0].replace(/\u2009/g," ").replace(/\s+/g," ").trim().replace(/\.$/,"");
+    var key=kv.replace(/\.$/,"");
+    if(first===key) lines.shift();
+  }
+  while(lines.length && !lines[0].trim()) lines.shift();
+
+  var body=lines.join("\n").trim();
+  var paras=body.split(/\n\s*\n+/).map(function(p){
+    return p.replace(/\s*\n\s*/g," ").replace(/\s+/g," ").trim();
+  }).filter(function(p){ return p.length>0; });
+
+  return {verse:verse,ref:ref,paras:paras};
+}
+
+function findSpurgeonEntry(data,month,day,half){
+  var t=half==="evening" ? "pm" : "am";
+  for(var i=0;i<data.length;i++){
+    if(+data[i].month===month && +data[i].day===day && data[i].time===t) return data[i];
+  }
+  return null;
+}
+
 function loadSpurgeon(){
-  var p=state.spDate.split("-"), mo=+p[1], dy=+p[2];
+  var p=state.spDate.split("-"), mo=+p[1], dy=+p[2], half=state.spHalf;
   state.spState="loading"; state.spData=null; render();
 
-  fetch(SPURGEON.page(mo,dy,state.spHalf))
-    .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
-    .then(function(html){
-      var parsed=parseSpurgeon(html);
+  getSpurgeonDataset()
+    .then(function(data){
+      var entry=findSpurgeonEntry(data,mo,dy,half);
+      if(!entry) throw new Error("reading not found");
+      var parsed=normalizeSpurgeonEntry(entry);
       if(!parsed.paras.length) throw new Error("nothing parsed");
       state.spData=parsed; state.spState="ready"; render();
     })
-    .catch(function(){ state.spState="error"; render(); });
+    .catch(function(){
+      // Optional compatibility fallback for Cloudflare Pages or another host
+      // that serves the legacy /spurgeon proxy function.
+      fetch(SPURGEON.page(mo,dy,half))
+        .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
+        .then(function(html){
+          var parsed=parseSpurgeon(html);
+          if(!parsed.paras.length) throw new Error("nothing parsed");
+          state.spData=parsed; state.spState="ready"; render();
+        })
+        .catch(function(){ state.spState="error"; render(); });
+    });
 }
 
 /* Pulls the verse, reference and body out of a CCEL reading page. */
@@ -263,11 +345,26 @@ function parseSpurgeon(html){
   var doc=new DOMParser().parseFromString(html,"text/html");
 
   var verse="", ref="";
-  var i=doc.querySelector(".Scripture, .scripture, i, em");
-  if(i) verse=i.textContent.replace(/\s+/g," ").replace(/^[“"']|[”"']$/g,"").trim();
+  var hs=doc.querySelectorAll("h2, h3, h4");
+  for(var hi=0;hi<hs.length;hi++){
+    var ht=hs[hi].textContent.replace(/\s+/g," ").trim();
+    if(/^(?:Morning|Evening),/i.test(ht)) continue;
+    if(/^[1-3]?\s*[A-Za-z].*\d+:\d+/.test(ht)){ ref=ht; break; }
+  }
 
-  var h=doc.querySelector("h3, h4");
-  if(h) ref=h.textContent.replace(/\s+/g," ").trim();
+  // Current CCEL pages put the key verse immediately before its reference
+  // heading. Prefer that text instead of generic <i>/<em> elements in the UI.
+  if(ref){
+    var refNode=null;
+    for(var rhi=0;rhi<hs.length;rhi++){
+      if(hs[rhi].textContent.replace(/\s+/g," ").trim()===ref){ refNode=hs[rhi]; break; }
+    }
+    if(refNode){
+      var prev=refNode.previousElementSibling;
+      while(prev && !prev.textContent.trim()) prev=prev.previousElementSibling;
+      if(prev) verse=prev.textContent.replace(/\s+/g," ").replace(/^[“"']|[”"']$/g,"").trim();
+    }
+  }
 
   var paras=[];
   var ps=doc.querySelectorAll("p");
@@ -277,6 +374,20 @@ function parseSpurgeon(html){
     if(/please\s+login|VIEWNAME|Christian Classics/i.test(t)) continue;
     if(verse && t.indexOf(verse.slice(0,40))===0) continue;
     paras.push(t);
+  }
+
+  // Some CCEL layouts render the devotional as plain text nodes rather than
+  // paragraphs. If needed, collect readable blocks after the reference.
+  if(!paras.length && ref){
+    var root=doc.querySelector("main, article, #content, .workSection") || doc.body;
+    var text=root.textContent.replace(/\r/g,"");
+    var at=text.indexOf(ref);
+    if(at>-1){
+      text=text.slice(at+ref.length).replace(/VIEWNAME[\s\S]*$/i,"").trim();
+      paras=text.split(/\n\s*\n+/).map(function(x){
+        return x.replace(/\s+/g," ").trim();
+      }).filter(function(x){ return x.length>60 && !/Go To (?:Morning|Evening) Reading/i.test(x); });
+    }
   }
   return { verse:verse, ref:ref, paras:paras };
 }
@@ -939,6 +1050,9 @@ function wire(scr){
   });
   var sp=$("spDate");
   if(sp) sp.onchange=function(){ state.spDate=sp.value; loadSpurgeon(); };
+  on(scr,"[data-spretry]",function(b){
+    b.onclick=function(){ loadSpurgeon(); };
+  });
 
   var pd=$("planDate");
   if(pd) pd.onchange=function(){ state.planDate=pd.value; render(); };

@@ -1,5 +1,5 @@
 /* The Applied Word — app shell cache */
-var CACHE = "applied-word-v7";
+var CACHE = "applied-word-v8";
 var SHELL = [
   "./", "./index.html", "./styles.css", "./content.js", "./mcheyne.js",
   "./bible.js", "./app.js", "./manifest.webmanifest",
@@ -28,7 +28,8 @@ self.addEventListener("fetch", function (e) {
   // Bible text is several MB and is deliberately imported into IndexedDB,
   // so avoid keeping a second copy in Cache Storage.
   if (url.pathname.indexOf("/data/bsb.txt") >= 0) return;
-  // Spurgeon is live content and should not be frozen in the shell cache.
+  // The optional /spurgeon proxy is only a compatibility fallback.
+  // The primary Spurgeon collection is cached in IndexedDB by app.js.
   if (url.pathname.indexOf("/spurgeon/") === 0) return;
 
   e.respondWith(

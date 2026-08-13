@@ -316,17 +316,23 @@ window.DEVOTIONS = [
 
 /* ============================================================
    SPURGEON — Morning and Evening (1866), public domain.
-   Looked up live per date from the Christian Classics Ethereal
-   Library through the /spurgeon proxy, so all 732 readings are
-   reachable without shipping any of them inside the app.
+
+   Static-host friendly: the app downloads the complete public-domain
+   dataset from GitHub once and keeps it in IndexedDB for future/offline
+   use. The existing /spurgeon proxy remains as a fallback for hosts that
+   support server-side functions.
    ============================================================ */
 window.SPURGEON = {
+  datasetUrl: "https://raw.githubusercontent.com/russianryebread/morning-and-evening/refs/heads/master/m_e.json",
   page: function (month, day, half) {
     var mm = String(month).length < 2 ? "0" + month : String(month);
     var dd = String(day).length < 2 ? "0" + day : String(day);
     return "/spurgeon/morneve.d" + mm + dd + (half === "evening" ? "pm" : "am") + ".html";
   },
   sourceUrl: function (month, day, half) {
-    return "https://ccel.org/ccel/spurgeon/" + this.page(month, day, half).replace("/spurgeon/", "");
+    var mm = String(month).length < 2 ? "0" + month : String(month);
+    var dd = String(day).length < 2 ? "0" + day : String(day);
+    return "https://ccel.org/ccel/spurgeon/morneve/morneve.d" + mm + dd +
+      (half === "evening" ? "pm" : "am") + ".html";
   }
 };

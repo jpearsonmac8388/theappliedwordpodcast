@@ -53,15 +53,13 @@ Change those two values if the show URL ever changes.
 
 The complete Bible reader now works on static hosting because the BSB source file is included locally. GitHub Pages, Netlify, Cloudflare Pages, or another HTTPS static host can serve the app.
 
-The optional live Spurgeon view still uses the Cloudflare Pages function in:
+The Spurgeon tab also works on plain static hosting. On first use it downloads the complete public-domain *Morning and Evening* dataset and stores it in IndexedDB for future/offline reading.
 
-`functions/spurgeon/[[path]].js`
-
-If you deploy somewhere that does not run that function, the rest of the app still works; only live Spurgeon fetching will fall back to its source link.
+The Cloudflare Pages function in `functions/spurgeon/[[path]].js` is retained only as a compatibility fallback; it is not required for GitHub Pages.
 
 ### Cloudflare Pages
 
-No build command is required. Set the output directory to the repository root. Cloudflare Pages will also run the Spurgeon function automatically.
+No build command is required. Set the output directory to the repository root. Cloudflare Pages will also run the optional Spurgeon fallback function automatically.
 
 ## Brand assets
 
@@ -79,7 +77,7 @@ The refreshed icon uses the same dark leather and muted-gold shield / sword / co
 
 The app keeps reading data on the device:
 
-- IndexedDB: downloaded BSB text
+- IndexedDB: downloaded BSB text and cached Spurgeon Morning & Evening collection
 - localStorage: highlights, notes, bookmarks, streak, plan completion, reader text size, and activity history
 
 Settings includes an export for marks/bookmarks/activity and reset controls.
@@ -95,3 +93,8 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 - `data/bsb.txt` — public-domain BSB source text
 - `sw.js` — offline app-shell service worker
 - `manifest.webmanifest` — PWA metadata
+
+
+## Spurgeon Morning & Evening
+
+The Spurgeon tab downloads the public-domain dataset once and caches it in IndexedDB, so it works on GitHub Pages and offline after the first successful load. The static dataset comes from the `russianryebread/morning-and-evening` repository; CCEL remains the source link and compatibility fallback.
