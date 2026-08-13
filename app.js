@@ -6,7 +6,7 @@ var SHOW_URL  = "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG";
 var EMBED_URL = "https://open.spotify.com/embed/show/75QaXUSGooCOG8oqKhuNmG?utm_source=generator&theme=0";
 
 /* ---------- small helpers ---------- */
-function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function bold(s){ return esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>"); }
 function pad(n){ return String(n).length < 2 ? "0"+n : String(n); }
 function today(){ return new Date(); }
@@ -35,18 +35,22 @@ var state = {
   version: ls("version") || "bsb",
   book: +(ls("book") || 58),      // James
   chapter: +(ls("chapter") || 1),
-  bview: "read",                   // read | books | chapters
+  bview: "read",                   // read | books | chapters | search
   loaded: {},                      // versionId -> {book:{chap:{v:text}}}
   meta: {},                        // versionId -> meta
   sel: null,                       // {b,c,v}
   listTab: "highlights",
+  searchQuery: "",
+  fontScale: Math.max(.85, Math.min(1.35, +(ls("fontScale") || 1))),
   // devotion
-  devMode: "today",                // today | spurgeon
+  devMode: "today",                // today | plan | spurgeon
   spDate: stampOf(new Date()),
   spHalf: "morning",
   spData: null, spState: "idle",
   // plans
   planDate: stampOf(new Date()),
+  // history
+  historyTab: "activity",
   // card
   cardRatio: "9:16", cardVerse: null
 };
@@ -83,6 +87,31 @@ function markWalk(){
   var y=stampOf(new Date(Date.now()-86400000));
   ls("streak", String(last===y ? getStreak()+1 : 1));
   ls("lastWalk", t);
+  logActivity("walk","Today","The Walk completed");
+}
+
+
+/* ---------- activity history ---------- */
+function activity(){ return jget("activity",[]); }
+function logActivity(type, ref, detail){
+  var list=activity(), now=Date.now(), last=list[0];
+  if(last && last.type===type && last.ref===ref && now-last.at<15000) return;
+  list.unshift({type:type,ref:ref||"",detail:detail||"",at:now});
+  if(list.length>250) list=list.slice(0,250);
+  jset("activity",list);
+}
+function recordChapterRead(b,c){
+  logActivity("read", BOOKS[b]+" "+c, "Bible reading");
+}
+function activityIcon(type){
+  return {walk:"✦",read:"▤",highlight:"●",note:"✎",share:"↗",card:"□",
+    bookmark:"★",podcast:"▶",download:"⇩",plan:"✓"}[type] || "•";
+}
+function activityLabel(type){
+  return {walk:"Devotional completed",read:"Read Scripture",highlight:"Highlighted verse",
+    note:"Added a note",share:"Shared a verse",card:"Created a verse card",
+    bookmark:"Bookmarked chapter",podcast:"Opened podcast",download:"Downloaded Bible",
+    plan:"Completed plan reading"}[type] || "Activity";
 }
 
 /* ---------- bible access ---------- */
@@ -122,6 +151,7 @@ function anyInstalled(){ return Object.keys(state.meta).length>0; }
    DEVOTION
    ============================================================ */
 function devotionView(){
+  if(state.devMode==="plan") return plansView();
   if(state.devMode==="spurgeon") return spurgeonView();
 
   var d=today(), n=dayOfYear(d);
@@ -134,8 +164,9 @@ function devotionView(){
       d.toLocaleDateString("en-US",{month:"long",day:"numeric"}).toUpperCase()+
       "<br>TODAY'S WORD</div></div>"+
 
-    '<div class="tabsel" style="margin-top:18px">'+
+    '<div class="tabsel devotion-tabs" style="margin-top:18px">'+
       '<button class="on" data-dev="today">TODAY</button>'+
+      '<button data-dev="plan">PLAN</button>'+
       '<button data-dev="spurgeon">SPURGEON</button>'+
     '</div>'+
 
@@ -162,7 +193,6 @@ function devotionView(){
     '<div class="foot">NO FLUFF. JUST THE WORD AND THE WALK.</div></div>';
 }
 
-/* ---------- Spurgeon, fetched live per date ---------- */
 function spurgeonView(){
   var parts=state.spDate.split("-");
   var mo=+parts[1], dy=+parts[2];
@@ -193,8 +223,9 @@ function spurgeonView(){
     '<div class="eyebrow">Morning and Evening</div>'+
     '<h1 style="font-size:33px">SPURGEON</h1><div class="rule" style="margin-bottom:6px"></div>'+
 
-    '<div class="tabsel">'+
+    '<div class="tabsel devotion-tabs">'+
       '<button data-dev="today">TODAY</button>'+
+      '<button data-dev="plan">PLAN</button>'+
       '<button class="on" data-dev="spurgeon">SPURGEON</button>'+
     '</div>'+
 
@@ -254,24 +285,23 @@ function parseSpurgeon(html){
    PODCAST
    ============================================================ */
 function podcastView(){
-  return '<div class="pad">'+
-    '<div class="eyebrow">The weekly episode</div>'+
-    '<h1 style="font-size:34px">LISTEN <em>IN</em></h1><div class="rule" style="margin-bottom:12px"></div>'+
-    '<p class="muted">A weekly devotional for men, hosted by Justin McFadden. Every episode plays '+
-      'right here — no account needed.</p>'+
+  return '<div class="pad podcast-page">'+
+    '<div class="eyebrow">The Applied Word podcast</div>'+
+    '<h1 style="font-size:34px">LISTEN <em>HERE</em></h1><div class="rule" style="margin-bottom:14px"></div>'+
+    '<div class="podcast-hero">'+
+      '<img src="assets/podcast-cover.jpg" alt="The Applied Word podcast cover" class="podcast-cover">'+
+      '<div><div class="podcast-title">Sharpening the man through the Message.</div>'+
+      '<p class="muted">Play the weekly devotional without leaving the app, or open the show in Spotify.</p></div>'+
+    '</div>'+
     '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word on Spotify" loading="lazy" '+
-      'allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
-    '<a class="cta" href="'+SHOW_URL+'" target="_blank" rel="noopener">OPEN IN SPOTIFY</a>'+
-    '<a class="cta ghost" href="'+SHOW_URL+'" target="_blank" rel="noopener">FOLLOW THE SHOW</a>'+
-    '<div class="where"><h4>IF THE PLAYER DOESN\'T LOAD</h4>'+
-      '<p class="muted">Some browsers block embedded players. The button above opens the show '+
-      'directly in Spotify, where every episode lives.</p></div>'+
-    '<div class="foot">SHARPENING THE MAN THROUGH THE MESSAGE</div></div>';
+      'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
+    '<a class="cta" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
+    '<a class="cta ghost" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="follow">FOLLOW THE SHOW</a>'+
+    '<div class="where"><h4>PLAYER TROUBLE?</h4>'+
+      '<p class="muted">If your browser blocks the embedded player, open the show in Spotify with the button above.</p></div>'+
+    '<div class="foot">THE APPLIED WORD · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
-/* ============================================================
-   READING PLANS — M'Cheyne
-   ============================================================ */
 function planDone(){ return jget("plandone",{}); }
 function togglePlanReading(dateStr, idx){
   var d=planDone(), k=dateStr;
@@ -316,7 +346,12 @@ function plansView(){
 
   return '<div class="pad">'+
     '<div class="eyebrow">Reading plan</div>'+
-    '<h1 style="font-size:33px">M\u2019CHEYNE</h1><div class="rule" style="margin-bottom:12px"></div>'+
+    '<div class="tabsel devotion-tabs" style="margin-top:10px">'+
+      '<button data-dev="today">TODAY</button>'+
+      '<button class="on" data-dev="plan">PLAN</button>'+
+      '<button data-dev="spurgeon">SPURGEON</button>'+
+    '</div>'+
+    '<h1 style="font-size:33px;margin-top:22px">M\u2019CHEYNE</h1><div class="rule" style="margin-bottom:12px"></div>'+
     '<p class="muted">Robert Murray M\u2019Cheyne wrote this calendar for his church in Dundee in '+
       'December 1842. Four chapters a day — two to read aloud with the house, two on your own. '+
       'Finish the year and you\u2019ve read the Old Testament once, the New Testament and Psalms twice.</p>'+
@@ -331,17 +366,22 @@ function plansView(){
 function bibleView(){
   if(!anyInstalled()){
     return '<div class="pad">'+
-      '<div class="eyebrow">Read it yourself</div>'+
-      '<h1 style="font-size:34px">THE <em>TEXT</em></h1><div class="rule"></div>'+
-      '<div class="empty"><h4>NO TRANSLATION YET</h4>'+
-      '<p>Head to Settings and tap Download on a tier. It pulls the real text from the Berean '+
-      'Bible and sets it up to read here — chapters, highlighting, notes, the lot.</p>'+
-      '<button class="cta" style="max-width:250px;margin:16px auto 0" data-go="settings">'+
-      'OPEN SETTINGS</button></div></div>';
+      '<div class="eyebrow">Complete offline Bible</div>'+
+      '<h1 style="font-size:34px">BIBLE <em>READER</em></h1><div class="rule"></div>'+
+      '<div class="bible-install">'+
+        '<div class="install-crest">✦</div>'+
+        '<h3>BEREAN STANDARD BIBLE</h3>'+
+        '<p>The BSB text is included with the app. Download it to this device once, then the full Bible is available offline with highlights, notes, bookmarks, search, sharing, and verse cards.</p>'+
+        '<div class="bar" id="bar-bsb" style="display:none"><i></i></div>'+
+        '<button class="cta" data-dl="bsb">DOWNLOAD BSB</button>'+
+        '<div class="tier-meta">PUBLIC DOMAIN · 66 BOOKS · STORED ON THIS DEVICE</div>'+
+      '</div>'+
+      '<div class="foot">THE BEREAN STANDARD BIBLE · PUBLIC DOMAIN</div></div>';
   }
 
   if(state.bview==="books") return bookPicker();
   if(state.bview==="chapters") return chapterPicker();
+  if(state.bview==="search") return bibleSearchView();
 
   var verses=chapterVerses(state.book,state.chapter);
   if(!verses){
@@ -362,14 +402,82 @@ function bibleView(){
   }).join("");
 
   return '<div class="pad">'+readBar()+
+    '<div class="reader-tools">'+
+      '<button data-bview="search" aria-label="Search Bible">&#9906; SEARCH</button>'+
+      '<button data-font="-1" aria-label="Decrease text size">A−</button>'+
+      '<button data-font="1" aria-label="Increase text size">A+</button>'+
+      '<button data-mark="1" aria-label="Bookmark chapter">'+(marked?'★':'☆')+'</button>'+
+    '</div>'+
     '<div class="chapter-title">'+esc(BOOKS[state.book])+' '+state.chapter+'</div>'+
-    '<div class="chapter-sub">'+esc((state.meta[state.version]||{}).abbr||"")+
+    '<div class="chapter-sub">'+esc((state.meta[state.version]||{}).abbr||"BSB")+
       ' · '+verses.length+' VERSES'+(marked?' · BOOKMARKED':'')+'</div>'+
-    rows+
-    '<div style="display:flex;gap:9px;margin-top:26px">'+
-      '<button class="cta ghost" style="margin-top:0" data-mark="1">'+
-        (marked?'&#9733; BOOKMARKED':'&#9734; BOOKMARK THIS CHAPTER')+'</button></div>'+
-    '<div class="foot">TAP ANY VERSE TO HIGHLIGHT, NOTE, OR MAKE A CARD</div></div>';
+    '<div class="reader-body" style="--reader-scale:'+state.fontScale+'">'+rows+'</div>'+
+    '<div class="reader-end">'+
+      '<button class="cta ghost" data-step="1">NEXT CHAPTER &#8250;</button>'+
+    '</div>'+
+    '<div class="foot">TAP ANY VERSE TO HIGHLIGHT, NOTE, SHARE, OR MAKE A CARD</div></div>';
+}
+
+function bibleSearchView(){
+  var q=state.searchQuery||"";
+  var results=q.trim() ? runBibleSearch(q) : [];
+  var rows="";
+  if(q.trim() && !results.length){
+    rows=emptyBox("NO MATCHES","Try a reference like John 3:16 or a few words from the verse.");
+  } else if(results.length){
+    rows='<div class="search-count">'+results.length+(results.length===75?"+":"")+' RESULT'+(results.length===1?"":"S")+'</div>'+
+      results.map(function(r){
+        return '<button class="search-result" data-jumpverse="'+r.b+':'+r.c+':'+r.v+'">'+
+          '<span class="item-ref">'+esc(refOf(r.b,r.c,r.v))+'</span>'+
+          '<span class="item-tx">'+esc(r.text)+'</span></button>';
+      }).join("");
+  } else {
+    rows='<div class="search-help">Search the entire BSB by reference or words. Examples: <b>John 3:16</b>, <b>fear of the Lord</b>, <b>be strong courageous</b>.</div>';
+  }
+  return '<div class="pad">'+
+    '<div class="readbar">'+
+      '<button class="nav" data-bview="read">&#8249;</button>'+
+      '<div class="readbar-title">SEARCH THE BIBLE</div>'+
+    '</div>'+
+    '<form class="bible-search" id="bibleSearchForm">'+
+      '<input id="bibleSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Reference or words" value="'+esc(q)+'">'+
+      '<button type="submit">SEARCH</button>'+
+    '</form>'+rows+
+    '<div class="foot">BEREAN STANDARD BIBLE</div></div>';
+}
+
+function runBibleSearch(query){
+  var q=String(query||"").trim();
+  if(!q) return [];
+
+  var exact=q.match(/^\s*((?:[1-3]\s*)?[A-Za-z][A-Za-z' ]*?)\s+(\d+)(?::(\d+))?\s*$/);
+  if(exact){
+    var b=resolveBook(exact[1]), c=+exact[2], v=exact[3]?+exact[3]:null;
+    if(b!==undefined && c>=1 && c<=CHAPS[b]){
+      if(v){
+        var tx=verseText(b,c,v);
+        return tx?[{b:b,c:c,v:v,text:tx}]:[];
+      }
+      return chapterVerses(b,c).map(function(x){ return {b:b,c:c,v:x[0],text:x[1]}; });
+    }
+  }
+
+  var words=q.toLowerCase().split(/\s+/).filter(Boolean), data=state.loaded[state.version]||{}, out=[];
+  Object.keys(data).some(function(bk){
+    var b=+bk;
+    return Object.keys(data[b]||{}).some(function(ck){
+      var c=+ck;
+      return Object.keys(data[b][c]||{}).some(function(vk){
+        var v=+vk, text=data[b][c][v];
+        var low=String(text).toLowerCase();
+        if(words.every(function(w){ return low.indexOf(w)>-1; })){
+          out.push({b:b,c:c,v:v,text:text});
+        }
+        return out.length>=75;
+      }) || out.length>=75;
+    }) || out.length>=75;
+  });
+  return out;
 }
 
 function readBar(){
@@ -389,6 +497,7 @@ function stepChapter(dir){
   if(c>CHAPS[b]){ b=b+1; if(b>65) return; c=1; }
   state.book=b; state.chapter=c; state.sel=null;
   ls("book",b); ls("chapter",c);
+  recordChapterRead(b,c);
   render();
 }
 
@@ -491,9 +600,83 @@ function emptyBox(h,p){
 }
 
 /* ============================================================
+   HISTORY + SAVED
+   ============================================================ */
+function historyView(){
+  var t=state.historyTab;
+  var m=marks(), markedKeys=Object.keys(m);
+  var noteN=markedKeys.filter(function(k){return !!m[k].note;}).length;
+  var hlN=markedKeys.filter(function(k){return !!m[k].hl;}).length;
+
+  var body=t==="saved" ? savedHistoryRows() : activityRows();
+  return '<div class="pad">'+
+    '<div class="eyebrow">Your activity</div>'+
+    '<h1 style="font-size:34px">HISTORY</h1><div class="rule" style="margin-bottom:6px"></div>'+
+    '<div class="history-stats">'+
+      '<div><b>'+getStreak()+'</b><span>STREAK</span></div>'+
+      '<div><b>'+hlN+'</b><span>HIGHLIGHTS</span></div>'+
+      '<div><b>'+noteN+'</b><span>NOTES</span></div>'+
+      '<div><b>'+bookmarks().length+'</b><span>BOOKMARKS</span></div>'+
+    '</div>'+
+    '<div class="tabsel">'+
+      '<button class="'+(t==="activity"?"on":"")+'" data-history="activity">ACTIVITY</button>'+
+      '<button class="'+(t==="saved"?"on":"")+'" data-history="saved">SAVED</button>'+
+    '</div>'+
+    '<div class="history-body">'+body+'</div>'+
+    (t==="activity" && activity().length ? '<button class="text-action" data-clearhistory="1">CLEAR ACTIVITY HISTORY</button>' : '')+
+    '<div class="foot">YOUR NOTES AND MARKS STAY ON THIS DEVICE</div></div>';
+}
+
+function activityRows(){
+  var rows=activity();
+  if(!rows.length) return emptyBox("NO ACTIVITY YET","As you read, highlight, take notes, share verses, and complete devotions, your recent activity will appear here.");
+  return '<div class="timeline">'+rows.map(function(a){
+    var d=new Date(a.at);
+    var when=d.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" · "+
+      d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+    var jump="";
+    var m=String(a.ref||"").match(/^(.+?)\s+(\d+)(?::(\d+))?$/);
+    if(m){
+      var b=resolveBook(m[1]);
+      if(b!==undefined) jump=' data-jumpverse="'+b+':'+(+m[2])+':'+(m[3]?+m[3]:1)+'"';
+    }
+    return '<button class="timeline-row"'+jump+'>'+
+      '<span class="timeline-icon">'+activityIcon(a.type)+'</span>'+
+      '<span class="timeline-copy"><b>'+esc(activityLabel(a.type))+'</b>'+
+      (a.ref?'<em>'+esc(a.ref)+'</em>':'')+
+      '<small>'+esc(when)+'</small></span></button>';
+  }).join("")+'</div>';
+}
+
+function savedHistoryRows(){
+  var m=marks();
+  var keys=Object.keys(m).sort(function(a,b){ return (m[b].at||0)-(m[a].at||0); });
+  var saved=[];
+
+  keys.forEach(function(k){
+    var p=k.split(":"), b=+p[0], c=+p[1], v=+p[2], e=m[k], text=verseText(b,c,v);
+    saved.push('<button class="saved-row" data-jumpverse="'+b+':'+c+':'+v+'">'+
+      '<span class="item-ref">'+(e.hl?'<i class="dot" style="background:var(--hl-'+e.hl+')"></i>':'')+
+        esc(refOf(b,c,v))+'</span>'+
+      (text?'<span class="item-tx">'+esc(text)+'</span>':'')+
+      (e.note?'<span class="item-note">'+esc(e.note)+'</span>':'')+
+      '</button>');
+  });
+
+  bookmarks().forEach(function(x){
+    saved.push('<button class="saved-row bookmark-row" data-jumpverse="'+x.b+':'+x.c+':1">'+
+      '<span class="item-ref">★ '+esc(refOf(x.b,x.c))+'</span>'+
+      '<span class="item-tx">Bookmarked chapter</span></button>');
+  });
+
+  return saved.length ? saved.join("") :
+    emptyBox("NOTHING SAVED YET","Highlights, notes, and chapter bookmarks will collect here.");
+}
+
+/* ============================================================
    VERSE CARDS
    ============================================================ */
-var RATIOS={ "9:16":[1080,1920], "3:4":[1080,1440] };
+var RATIOS={ "9:16":[1080,1920], "4:5":[1080,1350], "1:1":[1080,1080] };
 
 function cardView(){
   var cv=state.cardVerse;
@@ -509,8 +692,9 @@ function cardView(){
     '<div class="eyebrow">Share it</div>'+
     '<h1 style="font-size:34px">VERSE <em>CARD</em></h1><div class="rule" style="margin-bottom:4px"></div>'+
     '<div class="ratios">'+
-      '<button class="'+(state.cardRatio==="9:16"?"on":"")+'" data-ratio="9:16">9:16 · REELS &amp; STORIES</button>'+
-      '<button class="'+(state.cardRatio==="3:4"?"on":"")+'" data-ratio="3:4">3:4 · FEED POST</button>'+
+      '<button class="'+(state.cardRatio==="9:16"?"on":"")+'" data-ratio="9:16">9:16 · STORY</button>'+
+      '<button class="'+(state.cardRatio==="4:5"?"on":"")+'" data-ratio="4:5">4:5 · FEED</button>'+
+      '<button class="'+(state.cardRatio==="1:1"?"on":"")+'" data-ratio="1:1">1:1 · SQUARE</button>'+
     '</div>'+
     '<div class="cardprev"><canvas id="cardCanvas"></canvas></div>'+
     '<button class="cta" data-savecard="1">SAVE TO PHOTOS</button>'+
@@ -622,8 +806,9 @@ function saveCard(){
 
 function openCardFor(b,c,v){
   var text=verseText(b,c,v);
-  if(!text) return toast("Download a translation first");
+  if(!text) return toast("Download the BSB first");
   state.cardVerse={ ref:refOf(b,c,v), text:text, abbr:(state.meta[state.version]||{}).abbr||"BSB" };
+  logActivity("card",refOf(b,c,v),"Verse card");
   state.tab="card"; render();
 }
 
@@ -631,55 +816,34 @@ function openCardFor(b,c,v){
    SETTINGS
    ============================================================ */
 function settingsView(){
-  var cards=TIERS.map(function(t){
-    if(!t.available){
-      return '<div class="tier off">'+
-        '<div class="tier-top"><div class="tier-label">'+esc(t.label)+'</div>'+
-          '<div class="tier-badge">NOT AVAILABLE</div></div>'+
-        '<div class="tier-name">'+esc(t.name)+' ('+esc(t.abbr)+')</div>'+
-        '<div class="tier-note">'+esc(t.note)+'</div>'+
-        '<div class="tier-why">'+esc(t.why)+'</div>'+
-        '<a class="tier-btn ghost" href="'+t.link+'" target="_blank" rel="noopener" '+
-          'style="text-decoration:none">VISIT '+esc(t.origin).toUpperCase()+'</a></div>';
-    }
-    var m=state.meta[t.id];
-    var active=state.version===t.id;
-    return '<div class="tier">'+
-      '<div class="tier-top"><div class="tier-label">'+esc(t.label)+'</div>'+
-        '<div class="tier-badge'+(m?" in":"")+'">'+(m?"INSTALLED":"NOT DOWNLOADED")+'</div></div>'+
-      '<div class="tier-name">'+esc(t.name)+' ('+esc(t.abbr)+')</div>'+
-      '<div class="tier-note">'+esc(t.note)+'</div>'+
-      '<div class="bar" id="bar-'+t.id+'" style="display:none"><i></i></div>'+
-      (m
-        ? '<button class="tier-btn '+(active?"done":"ghost")+'" data-use="'+t.id+'">'+
-            (active?'&#10003; READING THIS':'READ THIS ONE')+'</button>'+
-          '<div class="tier-meta">'+m.verses.toLocaleString()+' VERSES · '+m.books+' BOOKS'+
-          ' · <span data-drop="'+t.id+'" style="cursor:pointer;text-decoration:underline">REMOVE</span></div>'
-        : '<button class="tier-btn" data-dl="'+t.id+'">DOWNLOAD</button>'+
-          '<div class="tier-meta">FROM '+esc(t.origin).toUpperCase()+'</div>')+
-    '</div>';
-  }).join("");
-
-  return '<div class="pad">'+
-    '<div class="eyebrow">Setup</div>'+
+  var tier=TIERS[0], m=state.meta.bsb;
+  return '<div class="pad settings-page">'+
+    '<button class="backlink" data-go="'+(anyInstalled()?'bible':'devotion')+'">&#8249; BACK</button>'+
+    '<div class="eyebrow">App &amp; library</div>'+
     '<h1 style="font-size:34px">SETTINGS</h1><div class="rule" style="margin-bottom:12px"></div>'+
-
     '<div class="grouphd" style="margin-top:6px">BIBLE LIBRARY</div>'+
-    '<p class="muted" style="font-size:13px">The Berean Bible was placed in the public domain in '+
-      'April 2023 — free to download, read, and keep, with no key and no fee. Tap Download and the '+
-      'app pulls the real text and sets it up to read.</p>'+
-    cards+
-
-    '<div class="grouphd" style="margin-top:30px">YOUR MARKS</div>'+
-    '<div class="setrow"><div><div class="lbl">Highlights &amp; notes</div>'+
-      '<div class="sub">'+Object.keys(marks()).length+' verses marked · '+
-      bookmarks().length+' bookmarks</div></div>'+
+    '<div class="tier">'+
+      '<div class="tier-top"><div class="tier-label">BEREAN STANDARD BIBLE</div>'+
+        '<div class="tier-badge'+(m?" in":"")+'">'+(m?"INSTALLED":"NOT DOWNLOADED")+'</div></div>'+
+      '<div class="tier-name">Berean Standard Bible (BSB)</div>'+
+      '<div class="tier-note">The public-domain text is bundled with the app. Download it once to import the complete Bible into offline storage.</div>'+
+      '<div class="bar" id="bar-bsb" style="display:none"><i></i></div>'+
+      (m
+        ? '<div class="tier-meta">'+m.verses.toLocaleString()+' VERSE RECORDS · '+m.books+' BOOKS · '+
+          '<span data-drop="bsb" style="cursor:pointer;text-decoration:underline">REMOVE LOCAL COPY</span></div>'
+        : '<button class="tier-btn" data-dl="bsb">DOWNLOAD BSB</button>')+
+    '</div>'+
+    '<div class="grouphd" style="margin-top:30px">YOUR DATA</div>'+
+    '<div class="setrow"><div><div class="lbl">Highlights, notes &amp; bookmarks</div>'+
+      '<div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' bookmarks</div></div>'+
       '<button class="mini" data-export="1">EXPORT</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Clear everything</div>'+
-      '<div class="sub">Removes all highlights, notes, bookmarks and downloads on this device.</div></div>'+
+    '<div class="setrow"><div><div class="lbl">Activity history</div>'+
+      '<div class="sub">'+activity().length+' recent actions saved on this device.</div></div>'+
+      '<button class="mini" data-clearhistory="1">CLEAR</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Reset app data</div>'+
+      '<div class="sub">Removes marks, bookmarks, activity, streaks, and the downloaded Bible copy.</div></div>'+
       '<button class="mini" data-wipe="1" style="color:var(--rust);border-color:rgba(209,169,78,.4)">RESET</button></div>'+
-
-    '<div class="foot">PUBLIC DOMAIN TEXT · NOTHING LEAVES YOUR PHONE</div></div>';
+    '<div class="foot">PUBLIC DOMAIN BIBLE TEXT · READING DATA STAYS LOCAL</div></div>';
 }
 
 function doDownload(id){
@@ -699,16 +863,16 @@ function doDownload(id){
     state.meta[id]=meta;
     return loadVersion(id).then(function(){
       if(!ls("version")||!state.meta[state.version]){ state.version=id; ls("version",id); }
-      toast(meta.abbr+" ready · "+meta.verses.toLocaleString()+" verses");
+      logActivity("download","Berean Standard Bible",meta.books+" books");
+      state.tab="bible"; state.bview="read";
+      toast(meta.abbr+" ready · "+meta.verses.toLocaleString()+" verse records");
       render();
     });
   })
   .catch(function(err){
     if(bar) bar.style.display="none";
     if(btn){ btn.disabled=false; btn.textContent="DOWNLOAD"; }
-    toast(/Failed|NetworkError|HTTP/.test(String(err.message))
-      ? "Download needs the proxy function — see the README"
-      : "Download failed — try again");
+    toast("Download failed — try again");
   });
 }
 
@@ -716,22 +880,21 @@ function doDownload(id){
    RENDER + WIRING
    ============================================================ */
 var TABS=[
-  {id:"devotion", label:"DEVOTION", icon:"\u2726"},
-  {id:"bible",    label:"BIBLE",    icon:"\u25A4"},
-  {id:"plans",    label:"PLAN",     icon:"\u2637"},
-  {id:"marks",    label:"MARGIN",   icon:"\u270E"},
-  {id:"settings", label:"SETTINGS", icon:"\u2699"}
+  {id:"devotion", label:"DEVOTION"},
+  {id:"podcast", label:"PODCAST"},
+  {id:"bible", label:"BIBLE"},
+  {id:"history", label:"HISTORY"}
 ];
 
 function screenHTML(){
   switch(state.tab){
     case "devotion": return devotionView();
-    case "bible":    return bibleView();
-    case "plans":    return plansView();
-    case "marks":    return listView();
-    case "card":     return cardView();
     case "podcast":  return podcastView();
-    default:         return settingsView();
+    case "bible":    return bibleView();
+    case "history":  return historyView();
+    case "card":     return cardView();
+    case "settings": return settingsView();
+    default:         return devotionView();
   }
 }
 
@@ -746,7 +909,7 @@ function render(){
   [].forEach.call(document.querySelectorAll("nav button"),function(b){
     var on = b.dataset.tab===state.tab ||
              (state.tab==="card" && b.dataset.tab==="bible") ||
-             (state.tab==="podcast" && b.dataset.tab==="devotion");
+             (state.tab==="settings" && b.dataset.tab==="bible");
     b.classList.toggle("on", on);
   });
 
@@ -782,14 +945,18 @@ function wire(scr){
   on(scr,"[data-plan]",function(b){
     b.onclick=function(e){
       if(e.target.closest("[data-planopen]")) return;
-      togglePlanReading(state.planDate, +b.dataset.plan); render();
+      var idx=+b.dataset.plan;
+      var was=(planDone()[state.planDate]||[]).indexOf(idx)>-1;
+      togglePlanReading(state.planDate,idx);
+      if(!was) logActivity("plan",state.planDate,"M'Cheyne reading");
+      render();
     };
   });
   on(scr,"[data-planopen]",function(b){
     b.onclick=function(e){ e.stopPropagation(); openRef(b.dataset.planopen); };
   });
 
-  // bible navigation
+  // Bible navigation
   on(scr,"[data-bview]",function(b){
     b.onclick=function(){ state.bview=b.dataset.bview; state.sel=null; render(); };
   });
@@ -805,15 +972,22 @@ function wire(scr){
   on(scr,"[data-chap]",function(b){
     b.onclick=function(){
       state.chapter=+b.dataset.chap; state.bview="read"; state.sel=null;
-      ls("chapter",state.chapter); render();
+      ls("chapter",state.chapter); recordChapterRead(state.book,state.chapter); render();
     };
   });
   on(scr,"[data-v]",function(b){
     b.onclick=function(){ openSheet(+b.dataset.v); };
   });
+  on(scr,"[data-font]",function(b){
+    b.onclick=function(){
+      state.fontScale=Math.max(.85,Math.min(1.35,state.fontScale+(+b.dataset.font*.1)));
+      ls("fontScale",state.fontScale.toFixed(2)); render();
+    };
+  });
   on(scr,"[data-mark]",function(b){
     b.onclick=function(){
       var added=toggleBookmark(state.book,state.chapter);
+      if(added) logActivity("bookmark",refOf(state.book,state.chapter),"Chapter bookmark");
       toast(added?"Bookmarked":"Bookmark removed"); render();
     };
   });
@@ -823,14 +997,49 @@ function wire(scr){
       state.book=+p[0]; state.chapter=+p[1];
       state.tab="bible"; state.bview="read"; state.sel=null;
       ls("book",state.book); ls("chapter",state.chapter);
+      recordChapterRead(state.book,state.chapter); render();
+    };
+  });
+  on(scr,"[data-jumpverse]",function(b){
+    b.onclick=function(){
+      var p=b.dataset.jumpverse.split(":");
+      state.book=+p[0]; state.chapter=+p[1]; var v=+p[2];
+      state.tab="bible"; state.bview="read"; state.sel=null;
+      ls("book",state.book); ls("chapter",state.chapter);
+      recordChapterRead(state.book,state.chapter); render();
+      setTimeout(function(){
+        var el=document.querySelector('[data-v="'+v+'"]');
+        if(el) el.scrollIntoView({block:"center",behavior:"smooth"});
+      },60);
+    };
+  });
+
+  var searchForm=$("bibleSearchForm");
+  if(searchForm) searchForm.onsubmit=function(e){
+    e.preventDefault();
+    var inp=$("bibleSearchInput");
+    state.searchQuery=inp?inp.value.trim():"";
+    render();
+  };
+
+  // History
+  on(scr,"[data-history]",function(b){
+    b.onclick=function(){ state.historyTab=b.dataset.history; render(); };
+  });
+  on(scr,"[data-clearhistory]",function(b){
+    b.onclick=function(){
+      jset("activity",[]);
+      toast("Activity history cleared");
       render();
     };
   });
+
+  // Legacy saved-list wiring
   on(scr,"[data-list]",function(b){
     b.onclick=function(){ state.listTab=b.dataset.list; render(); };
   });
 
-  // cards
+  // Cards
   on(scr,"[data-ratio]",function(b){
     b.onclick=function(){ state.cardRatio=b.dataset.ratio; render(); };
   });
@@ -842,14 +1051,18 @@ function wire(scr){
     b.onclick=function(){
       var s=state.spData; if(!s||!s.verse) return;
       state.cardVerse={ ref:s.ref||"Spurgeon", text:s.verse, abbr:"" };
+      logActivity("card",s.ref||"Spurgeon","Verse card");
       state.tab="card"; render();
     };
   });
   on(scr,"[data-openref]",function(b){
     b.onclick=function(){ openRef(b.dataset.openref); };
   });
+  on(scr,"[data-podact]",function(b){
+    b.onclick=function(){ logActivity("podcast","The Applied Word","Spotify"); };
+  });
 
-  // settings
+  // Settings / Bible library
   on(scr,"[data-dl]",function(b){ b.onclick=function(){ doDownload(b.dataset.dl); }; });
   on(scr,"[data-use]",function(b){
     b.onclick=function(){
@@ -862,21 +1075,18 @@ function wire(scr){
       var id=b.dataset.drop;
       removeTier(id).then(function(){
         delete state.meta[id]; delete state.loaded[id];
-        if(state.version===id){
-          var left=Object.keys(state.meta);
-          state.version=left[0]||"bsb"; ls("version",state.version);
-        }
-        toast("Removed"); render();
+        state.version="bsb"; ls("version","bsb");
+        toast("Local Bible copy removed"); render();
       });
     };
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), exported:new Date().toISOString() };
+      var data={ marks:marks(), bookmarks:bookmarks(), activity:activity(), exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
-      a.href=url; a.download="applied-word-marks.json";
+      a.href=url; a.download="applied-word-data.json";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(url); },5000);
       toast("Exported");
@@ -885,11 +1095,11 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("plandone",{});
+        jset("marks",{}); jset("bookmarks",[]); jset("plandone",{}); jset("activity",[]);
         ls("streak","0"); ls("lastWalk","");
         Promise.all(TIERS.filter(function(t){return t.available;})
           .map(function(t){ return removeTier(t.id); }))
-          .then(function(){ state.meta={}; state.loaded={}; toast("Everything cleared"); render(); });
+          .then(function(){ state.meta={}; state.loaded={}; state.tab="devotion"; toast("Everything cleared"); render(); });
       } else {
         b.dataset.armed="1"; b.textContent="TAP AGAIN TO CONFIRM";
       }
@@ -908,10 +1118,11 @@ function parseRef(ref){
 function openRef(ref){
   var r=parseRef(ref);
   if(!r) return toast("Couldn't read that reference");
-  if(!anyInstalled()){ state.tab="settings"; render(); return toast("Download a translation first"); }
+  if(!anyInstalled()){ state.tab="bible"; render(); return toast("Download the BSB first"); }
   state.book=r.b; state.chapter=Math.min(r.c, CHAPS[r.b]);
   state.tab="bible"; state.bview="read"; state.sel=null;
   ls("book",state.book); ls("chapter",state.chapter);
+  recordChapterRead(state.book,state.chapter);
   render();
   if(r.v){
     setTimeout(function(){
@@ -923,11 +1134,27 @@ function openRef(ref){
 function cardFromRef(ref){
   var r=parseRef(ref);
   if(!r||!r.v) return toast("Pick a single verse for a card");
-  if(!verseText(r.b,r.c,r.v)){ state.tab="settings"; render(); return toast("Download a translation first"); }
+  if(!verseText(r.b,r.c,r.v)){ state.tab="bible"; render(); return toast("Download the BSB first"); }
   openCardFor(r.b,r.c,r.v);
 }
 
 /* ---------- sheet controls (outside the re-rendered screen) ---------- */
+function shareVerse(b,c,v){
+  var t=verseText(b,c,v);
+  if(!t) return toast("Verse text isn't available");
+  var ref=refOf(b,c,v), abbr=(state.meta[state.version]||{}).abbr||"BSB";
+  var out='“'+t+'” — '+ref+' ('+abbr+')';
+  if(navigator.share){
+    navigator.share({title:ref,text:out}).then(function(){
+      logActivity("share",ref,"Verse shared");
+    }).catch(function(){});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(out).then(function(){
+      logActivity("share",ref,"Copied for sharing"); toast("Copied for sharing");
+    });
+  } else toast("Sharing isn't available here");
+}
+
 function initSheet(){
   $("scrim").onclick=closeSheet;
   $("sheetClose").onclick=closeSheet;
@@ -939,6 +1166,7 @@ function initSheet(){
       var cur=markFor(state.sel.b,state.sel.c,state.sel.v);
       var next=(cur&&cur.hl===c)?null:c;
       setMark(state.sel.b,state.sel.c,state.sel.v,{hl:next});
+      if(next) logActivity("highlight",refOf(state.sel.b,state.sel.c,state.sel.v),next+" highlight");
       [].forEach.call(document.querySelectorAll(".sw"),function(o){
         o.classList.toggle("on", !!next && o.dataset.c===next);
       });
@@ -953,9 +1181,15 @@ function initSheet(){
   };
   $("sheetNote").onblur=function(){
     if(!state.sel) return;
-    var val=$("sheetNote").value.trim();
-    setMark(state.sel.b,state.sel.c,state.sel.v,{note:val||null});
+    var s=state.sel, val=$("sheetNote").value.trim();
+    setMark(s.b,s.c,s.v,{note:val||null});
+    if(val) logActivity("note",refOf(s.b,s.c,s.v),"Bible note");
     render();
+  };
+  $("sheetShareBtn").onclick=function(){
+    if(!state.sel) return;
+    var s=state.sel;
+    shareVerse(s.b,s.c,s.v);
   };
   $("sheetCardBtn").onclick=function(){
     if(!state.sel) return;
@@ -965,7 +1199,7 @@ function initSheet(){
     if(!state.sel) return;
     var s=state.sel;
     var t=verseText(s.b,s.c,s.v);
-    var out='"'+t+'" — '+refOf(s.b,s.c,s.v)+" ("+((state.meta[state.version]||{}).abbr||"BSB")+")";
+    var out='“'+t+'” — '+refOf(s.b,s.c,s.v)+" ("+((state.meta[state.version]||{}).abbr||"BSB")+")";
     if(navigator.clipboard) navigator.clipboard.writeText(out).then(function(){ toast("Copied"); });
     else toast("Copy isn't available here");
   };
@@ -976,9 +1210,13 @@ function initSheet(){
   b.onclick=function(){
     state.tab=b.dataset.tab;
     if(state.tab==="bible") state.bview="read";
+    if(state.tab==="podcast") logActivity("podcast","The Applied Word","Podcast tab");
     render();
   };
 });
+
+var settingsBtn=$("settingsBtn");
+if(settingsBtn) settingsBtn.onclick=function(){ state.tab="settings"; render(); };
 
 initSheet();
 

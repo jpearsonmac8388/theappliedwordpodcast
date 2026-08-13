@@ -18,64 +18,20 @@ window.CHAPS = [50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8
 
 window.OT_COUNT = 39;
 
-/* ---------- the four tiers ----------
-   Only tiers with a real published plain-text file can be read in the app.
-   The other two are shown honestly rather than given a button that breaks. */
+/* ---------- Bible download ----------
+   The public-domain BSB text ships with the app and is imported into IndexedDB
+   only when the reader taps Download. */
 window.TIERS = [
   {
     id: "bsb",
-    label: "STUDY",
+    label: "BIBLE",
     name: "Berean Standard Bible",
     abbr: "BSB",
-    note: "The modern English tier — the one to read daily. Complete, all 66 books.",
-    src: "/berean/bsb.txt",
-    origin: "bereanbible.com",
+    note: "The complete Berean Standard Bible. Download it once, then read all 66 books offline.",
+    src: "data/bsb.txt",
+    origin: "BereanBible.com",
     format: "tagged",
     available: true
-  },
-  {
-    id: "blb",
-    label: "LITERAL",
-    name: "Berean Literal Bible",
-    abbr: "BLB",
-    note: "Word-for-word, following the Greek and Hebrew sentence structure closely.",
-    src: "/berean/blb.txt",
-    origin: "literalbible.com",
-    format: "tagged",
-    available: true
-  },
-  {
-    id: "brb",
-    label: "READER'S",
-    name: "Berean Reader's Bible",
-    abbr: "BRB",
-    note: "The Standard text set as flowing paragraphs, for reading long stretches.",
-    src: "/berean/brb.txt",
-    origin: "readersbible.com",
-    format: "readers",
-    available: true
-  },
-  {
-    id: "bib",
-    label: "INTERLINEAR",
-    name: "Berean Interlinear Bible",
-    abbr: "BIB",
-    note: "Greek and Hebrew with an English gloss under every word, plus Strong's numbers.",
-    why: "Bible Hub publishes this as PDF and Word only — there is no plain-text edition anywhere, because each word carries six separate fields. Nothing exists for the app to read.",
-    origin: "interlinearbible.com",
-    link: "https://interlinearbible.com/",
-    available: false
-  },
-  {
-    id: "beb",
-    label: "EMPHASIZED",
-    name: "Berean Emphasized Bible",
-    abbr: "BEB",
-    note: "Built to carry the full intensity and nuance of the original wording.",
-    why: "Still under construction by its own publisher. No edition has been released yet, in any format.",
-    origin: "emphasizedbible.com",
-    link: "https://emphasizedbible.com/",
-    available: false
   }
 ];
 

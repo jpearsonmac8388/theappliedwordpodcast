@@ -277,3 +277,138 @@ nav button i{font-style:normal;font-size:14px;line-height:1}
 
 :focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+
+/* ============================================================
+   2026 APP REFRESH — leather / gold brand system
+   ============================================================ */
+:root{
+  --forge:#1b1510;
+  --ground:#2b211a;
+  --raise:#382b21;
+  --rust:#bd9650;
+  --brass:#e0c27a;
+  --bone:#f1e6d2;
+  --ash:#b39b7c;
+}
+body{
+  background-color:var(--forge);
+  background-image:
+    radial-gradient(ellipse at 50% -10%,rgba(224,194,122,.12),transparent 42%),
+    repeating-linear-gradient(92deg,rgba(255,255,255,.012) 0,rgba(255,255,255,.012) 1px,transparent 1px,transparent 4px),
+    repeating-linear-gradient(3deg,rgba(0,0,0,.08) 0,rgba(0,0,0,.08) 1px,transparent 1px,transparent 5px);
+}
+#ember{background:radial-gradient(ellipse 74% 105% at 50% 0%,rgba(224,194,122,.12),transparent 67%)}
+header{
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background:linear-gradient(180deg,rgba(33,25,19,.98),rgba(27,21,16,.94));
+  border-bottom:1px solid rgba(224,194,122,.13);
+}
+.brand-lockup{display:flex;align-items:center;gap:9px;min-width:0}
+.brand-icon{width:34px;height:34px;border-radius:9px;box-shadow:0 5px 14px rgba(0,0,0,.26)}
+.brand-kicker{font-family:var(--util);font-size:7px;letter-spacing:.24em;color:var(--ash);line-height:1}
+.brand-lockup .wordmark{font-size:10px;letter-spacing:.17em;color:var(--brass);margin-top:4px;white-space:nowrap}
+.header-tools{display:flex;align-items:center;gap:8px}
+.icon-btn{
+  width:34px;height:34px;border-radius:50%;border:1px solid rgba(224,194,122,.18);
+  color:var(--brass);background:rgba(56,43,33,.65);font-size:15px;cursor:pointer
+}
+.streak{font-size:8.5px;letter-spacing:.1em}
+main{scrollbar-width:none}
+
+.devotion-tabs{display:grid;grid-template-columns:repeat(3,1fr)}
+.devotion-tabs button{min-width:0}
+
+.podcast-hero{
+  display:grid;grid-template-columns:112px 1fr;gap:15px;align-items:center;
+  background:linear-gradient(145deg,rgba(58,43,32,.92),rgba(37,28,22,.92));
+  border:1px solid rgba(224,194,122,.13);padding:12px;margin-top:8px
+}
+.podcast-cover{width:112px;aspect-ratio:1;object-fit:cover;border:1px solid rgba(224,194,122,.22);box-shadow:0 12px 24px rgba(0,0,0,.24)}
+.podcast-title{font-family:var(--scrip);font-size:18px;line-height:1.35;color:var(--bone);margin-bottom:8px}
+#player{border-color:rgba(224,194,122,.14);overflow:hidden}
+
+.bible-install{
+  margin-top:20px;padding:28px 20px;text-align:center;
+  background:linear-gradient(155deg,rgba(58,43,32,.94),rgba(36,27,21,.94));
+  border:1px solid rgba(224,194,122,.18);box-shadow:inset 0 0 0 4px rgba(18,13,10,.24)
+}
+.bible-install h3{font-size:18px;letter-spacing:.06em;color:var(--brass);margin:10px 0}
+.bible-install p{font-size:14px;line-height:1.65;color:rgba(241,230,210,.74)}
+.install-crest{width:58px;height:58px;margin:0 auto;border:1px solid rgba(224,194,122,.45);display:grid;place-items:center;transform:rotate(45deg);color:var(--brass);font-size:24px}
+.install-crest::first-letter{display:inline-block;transform:rotate(-45deg)}
+.bible-install .cta{max-width:280px;margin:20px auto 10px}
+
+.readbar{background:rgba(27,21,16,.97);backdrop-filter:blur(12px)}
+.readbar-title{flex:1;font-family:var(--util);font-size:10px;letter-spacing:.16em;color:var(--brass);text-align:center}
+.reader-tools{display:grid;grid-template-columns:1fr 52px 52px 44px;gap:7px;margin-top:13px}
+.reader-tools button{
+  border:1px solid rgba(224,194,122,.13);background:rgba(56,43,33,.72);color:var(--brass);
+  padding:10px 7px;font-family:var(--util);font-size:9.5px;font-weight:700;letter-spacing:.08em
+}
+.reader-body .v-tx{font-size:calc(17px * var(--reader-scale));line-height:1.68}
+.reader-end{margin-top:22px}
+.reader-end .cta{margin-top:0}
+
+.bible-search{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:18px}
+.bible-search input{
+  min-width:0;background:var(--ground);border:1px solid rgba(224,194,122,.18);color:var(--bone);
+  padding:13px 12px;font-family:var(--slab);font-size:15px
+}
+.bible-search button{
+  background:var(--rust);border:1px solid var(--rust);color:#17110d;
+  padding:0 13px;font-family:var(--util);font-size:9.5px;font-weight:700;letter-spacing:.1em
+}
+.search-help{margin-top:18px;padding:16px;background:rgba(56,43,33,.62);font-size:13.5px;line-height:1.65;color:rgba(241,230,210,.7)}
+.search-help b{color:var(--brass)}
+.search-count{margin:18px 0 8px;font-family:var(--util);font-size:9px;letter-spacing:.14em;color:var(--ash)}
+.search-result,.saved-row,.timeline-row{
+  width:100%;display:block;text-align:left;background:transparent;border:0;border-bottom:1px solid rgba(224,194,122,.09);
+  color:var(--bone);padding:13px 2px;cursor:pointer
+}
+.search-result .item-ref,.saved-row .item-ref{display:block;margin-bottom:6px}
+.search-result .item-tx,.saved-row .item-tx{display:block}
+
+.history-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:16px 0}
+.history-stats div{background:rgba(56,43,33,.7);border:1px solid rgba(224,194,122,.09);padding:12px 4px;text-align:center}
+.history-stats b{display:block;font-size:20px;color:var(--brass)}
+.history-stats span{display:block;margin-top:4px;font-family:var(--util);font-size:6.8px;letter-spacing:.08em;color:var(--ash)}
+.history-body{margin-top:10px}
+.timeline-row{display:flex;gap:12px;align-items:flex-start}
+.timeline-icon{
+  width:34px;height:34px;flex:0 0 34px;border:1px solid rgba(224,194,122,.18);display:grid;place-items:center;
+  color:var(--brass);background:rgba(56,43,33,.65)
+}
+.timeline-copy{display:block;min-width:0}
+.timeline-copy b{display:block;font-size:13px;color:var(--bone)}
+.timeline-copy em{display:block;font-family:var(--scrip);font-style:normal;font-size:13px;color:var(--brass);margin-top:3px}
+.timeline-copy small{display:block;font-family:var(--util);font-size:8px;letter-spacing:.08em;color:var(--ash);margin-top:5px}
+.saved-row .item-note{display:block;margin-top:8px}
+.text-action,.backlink{
+  display:block;margin:20px auto 0;background:transparent;border:0;color:var(--ash);
+  font-family:var(--util);font-size:9px;letter-spacing:.12em;text-decoration:underline;cursor:pointer
+}
+.backlink{margin:0 0 18px;text-align:left;text-decoration:none;color:var(--brass)}
+
+.sheet-acts.four{display:grid;grid-template-columns:repeat(4,1fr)}
+.sheet-acts.four button{min-width:0;font-size:8.5px;padding-left:2px;padding-right:2px}
+
+.ratios{display:grid;grid-template-columns:repeat(3,1fr)}
+.ratios button{font-size:8.5px}
+.settings-page .tier{margin-top:10px}
+
+nav{
+  min-height:64px;background:rgba(47,35,27,.98);
+  border-top-color:rgba(224,194,122,.14)
+}
+nav button{padding:10px 2px 11px}
+nav button span{font-size:8px;letter-spacing:.08em}
+nav button i{font-size:15px}
+nav button.on{color:var(--brass);border-top-color:var(--brass)}
+
+@media (max-width:360px){
+  .podcast-hero{grid-template-columns:92px 1fr}
+  .podcast-cover{width:92px}
+  .history-stats span{font-size:6px}
+  .reader-tools{grid-template-columns:1fr 48px 48px 42px}
+}

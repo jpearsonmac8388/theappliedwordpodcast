@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs>
+  <radialGradient id="bg" cx="50%" cy="12%" r="95%">
+    <stop offset="0" stop-color="#403126"/>
+    <stop offset=".55" stop-color="#211913"/>
+    <stop offset="1" stop-color="#14100d"/>
+  </radialGradient>
+  <filter id="grain">
+    <feTurbulence type="fractalNoise" baseFrequency=".65" numOctaves="4" seed="12" result="n"/>
+    <feColorMatrix in="n" type="saturate" values="0"/>
+    <feComponentTransfer><feFuncA type="table" tableValues="0 .13"/></feComponentTransfer>
+    <feBlend in="SourceGraphic" mode="soft-light"/>
+  </filter>
+  <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f5dc96"/>
+    <stop offset=".43" stop-color="#caa55b"/>
+    <stop offset=".72" stop-color="#f0cd78"/>
+    <stop offset="1" stop-color="#9e793c"/>
+  </linearGradient>
+</defs>
+<rect width="1024" height="1024" rx="176" fill="url(#bg)"/>
+<rect x="46" y="46" width="932" height="932" rx="142" fill="none" stroke="url(#gold)" stroke-width="18"/>
+<rect x="76" y="76" width="872" height="872" rx="120" fill="none" stroke="#8b6b38" stroke-width="5" opacity=".7"/>
+<g filter="url(#grain)"><rect x="90" y="90" width="844" height="844" rx="112" fill="#211914" opacity=".55"/></g>
+
+<!-- sword -->
+<g stroke="url(#gold)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M512 190 L548 242 L531 302 L531 722 L512 806 L493 722 L493 302 L476 242 Z" stroke-width="22"/>
+  <path d="M414 314 Q512 352 610 314" stroke-width="26"/>
+  <path d="M452 309 L572 309" stroke-width="12"/>
+  <path d="M489 211 L535 211" stroke-width="12"/>
+</g>
+
+<!-- shield -->
+<path d="M304 350 Q512 285 720 350 L698 611 Q674 737 512 824 Q350 737 326 611 Z"
+      fill="#17120f" stroke="url(#gold)" stroke-width="22"/>
+<path d="M345 385 Q512 335 679 385 L662 597 Q644 690 512 764 Q380 690 362 597 Z"
+      fill="none" stroke="#9e793c" stroke-width="7"/>
+
+<!-- open book -->
+<path d="M382 520 Q440 489 500 530 L500 661 Q443 624 382 649 Z"
+      fill="none" stroke="url(#gold)" stroke-width="18"/>
+<path d="M642 520 Q584 489 524 530 L524 661 Q581 624 642 649 Z"
+      fill="none" stroke="url(#gold)" stroke-width="18"/>
+<path d="M512 526 L512 666" stroke="url(#gold)" stroke-width="11"/>
+
+<!-- compass -->
+<circle cx="512" cy="462" r="100" fill="#1b1511" stroke="url(#gold)" stroke-width="15"/>
+<circle cx="512" cy="462" r="72" fill="none" stroke="#a98649" stroke-width="6"/>
+<path d="M512 375 L535 439 L599 462 L535 485 L512 549 L489 485 L425 462 L489 439 Z"
+      fill="none" stroke="url(#gold)" stroke-width="13"/>
+<path d="M512 392 L526 450 L512 462 L498 450 Z" fill="url(#gold)" stroke="none"/>
+
+<!-- tiny stars -->
+<g fill="#d2ad61">
+  <path d="M397 698 l8 18 18 8-18 8-8 18-8-18-18-8 18-8z"/>
+  <path d="M627 698 l8 18 18 8-18 8-8 18-8-18-18-8 18-8z"/>
+</g>
+</svg>

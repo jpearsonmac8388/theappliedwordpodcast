@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Applied Word — A Daily Devotional for Men</title>
-<meta name="description" content="Sharpening the man through the Message. A daily devotional for men, the weekly podcast, and the Berean Standard Bible.">
-<meta name="theme-color" content="#1E140C">
+<title>The Applied Word — Devotional, Podcast &amp; Bible</title>
+<meta name="description" content="The Applied Word: a devotional for men, the weekly podcast, and an offline Berean Standard Bible reader.">
+<meta name="theme-color" content="#1B1510">
 
 <meta property="og:title" content="The Applied Word">
-<meta property="og:description" content="Sharpening the man through the Message. A daily devotional for men.">
+<meta property="og:description" content="Sharpening the man through the Message.">
 <meta property="og:image" content="icons/social-card.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -30,48 +30,57 @@
 <div id="ember"></div>
 
 <header>
-  <div class="wordmark">THE <b>APPLIED WORD</b></div>
-  <div class="streak"><i class="flame"></i> <span id="streakN">0</span> DAYS</div>
+  <div class="brand-lockup">
+    <img src="icons/icon-192.png" alt="" class="brand-icon">
+    <div>
+      <div class="brand-kicker">THE</div>
+      <div class="wordmark">APPLIED WORD</div>
+    </div>
+  </div>
+  <div class="header-tools">
+    <div class="streak" aria-label="Current devotional streak"><i class="flame"></i> <span id="streakN">0</span> DAYS</div>
+    <button id="settingsBtn" class="icon-btn" aria-label="Open settings" title="Settings">&#9881;</button>
+  </div>
 </header>
 
-<main id="screen"></main>
+<main id="screen" aria-live="polite"></main>
 
-<nav>
+<nav aria-label="Primary navigation">
   <button data-tab="devotion" class="on"><i>&#10022;</i><span>DEVOTION</span></button>
+  <button data-tab="podcast"><i>&#9654;</i><span>PODCAST</span></button>
   <button data-tab="bible"><i>&#9636;</i><span>BIBLE</span></button>
-  <button data-tab="plans"><i>&#9783;</i><span>PLAN</span></button>
-  <button data-tab="marks"><i>&#9998;</i><span>MARGIN</span></button>
-  <button data-tab="settings"><i>&#9881;</i><span>SETTINGS</span></button>
+  <button data-tab="history"><i>&#8635;</i><span>HISTORY</span></button>
 </nav>
 
 <div id="scrim"></div>
-<div id="sheet">
+<div id="sheet" role="dialog" aria-modal="true" aria-label="Verse actions">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
     <div class="sref" id="sheetRef">—</div>
     <button id="sheetClose" style="background:transparent;border:0;color:var(--ash);
-      font-size:17px;padding:2px 6px;cursor:pointer">&times;</button>
+      font-size:20px;padding:2px 6px;cursor:pointer" aria-label="Close">&times;</button>
   </div>
   <div class="stext" id="sheetText"></div>
 
-  <div class="swatches">
-    <div class="sw" data-c="gold"></div>
-    <div class="sw" data-c="rust"></div>
-    <div class="sw" data-c="green"></div>
-    <div class="sw" data-c="blue"></div>
-    <div class="sw" data-c="violet"></div>
-    <div class="sw none" data-c="">&#8709;</div>
+  <div class="swatches" aria-label="Highlight color">
+    <div class="sw" data-c="gold" title="Gold"></div>
+    <div class="sw" data-c="rust" title="Rust"></div>
+    <div class="sw" data-c="green" title="Green"></div>
+    <div class="sw" data-c="blue" title="Blue"></div>
+    <div class="sw" data-c="violet" title="Violet"></div>
+    <div class="sw none" data-c="" title="Clear highlight">&#8709;</div>
   </div>
 
-  <div class="sheet-acts">
+  <div class="sheet-acts four">
     <button id="sheetNoteBtn">&#9998; NOTE</button>
-    <button id="sheetCardBtn">&#9634; MAKE CARD</button>
+    <button id="sheetShareBtn">&#8599; SHARE</button>
+    <button id="sheetCardBtn">&#9634; CARD</button>
     <button id="sheetCopyBtn">&#10064; COPY</button>
   </div>
 
   <textarea id="sheetNote" placeholder="What did you see in this verse?"></textarea>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 
 <script src="content.js"></script>
 <script src="mcheyne.js"></script>
