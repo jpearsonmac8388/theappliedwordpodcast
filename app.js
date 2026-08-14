@@ -13,6 +13,17 @@ function today(){ return new Date(); }
 function dayOfYear(d){ return Math.floor((d - new Date(d.getFullYear(),0,0)) / 86400000); }
 function stampOf(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
 function $(id){ return document.getElementById(id); }
+function snip(s,n){
+  s=String(s||"").trim();
+  if(s.length<=n) return s;
+  var out=s.slice(0,n), cut=out.lastIndexOf(" ");
+  out=(cut>n*0.6?out.slice(0,cut):out).replace(/[ ,;:.!?-]+$/,"");
+  return out+"…";
+}
+function screenHead(title,subtitle){
+  return '<div class="screen-head"><div class="screen-title">'+esc(title)+'</div>'+
+    (subtitle?'<div class="screen-subtitle">'+esc(subtitle)+'</div>':'')+'</div>';
+}
 
 function ls(k,v){
   try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }
@@ -156,39 +167,54 @@ function devotionView(){
   var d=today(), n=dayOfYear(d);
   var dev=DEVOTIONS[(n-1) % DEVOTIONS.length];
   var done=walkedToday();
+  var title=dev.title[0]+" "+dev.title[1];
+  var dateLine=d.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
 
-  return '<div class="pad">'+
-    '<div class="datestrip"><div class="daynum">'+n+'</div><div class="daymeta">'+
-      d.toLocaleDateString("en-US",{weekday:"long"}).toUpperCase()+" · "+
-      d.toLocaleDateString("en-US",{month:"long",day:"numeric"}).toUpperCase()+
-      "<br>TODAY'S WORD</div></div>"+
+  return '<div class="pad home-page">'+
+    screenHead("Today", dateLine)+
 
-    '<div class="tabsel devotion-tabs" style="margin-top:18px">'+
+    '<div class="tabsel devotion-tabs devotion-switch">'+
       '<button class="'+(state.devMode==="today"?"on":"")+'" data-dev="today">TODAY</button>'+
       '<button class="'+(state.devMode==="plan"?"on":"")+'" data-dev="plan">PLAN</button>'+
     '</div>'+
 
-    '<h1>'+esc(dev.title[0])+'<br><em>'+esc(dev.title[1])+'</em></h1>'+
-    '<div class="rule"></div>'+
+    '<div class="feature-card devotion-feature">'+
+      '<div class="feature-media dawn"></div>'+
+      '<div class="feature-content">'+
+        '<div class="feature-kicker">DAILY DEVOTIONAL</div>'+
+        '<div class="feature-title">'+esc(title)+'</div>'+
+        '<div class="feature-refline">'+esc(dev.ref)+' · BSB</div>'+
+        '<div class="feature-text">'+esc(snip(dev.verse,170))+'</div>'+
+      '</div>'+
+    '</div>'+
 
-    '<div class="bracket"><p class="verse">'+esc(dev.verse)+'</p>'+
-      '<div class="ref" style="margin-top:14px">'+esc(dev.ref)+' · BSB</div></div>'+
+    '<div class="quick-grid">'+
+      '<button class="quick-card" data-openref="'+esc(dev.ref)+'">'+
+        '<span class="quick-ico">▤</span><span><b>Read the chapter</b><small>'+esc(dev.ref)+'</small></span></button>'+
+      '<button class="quick-card" data-cardref="'+esc(dev.ref)+'">'+
+        '<span class="quick-ico">□</span><span><b>Create verse image</b><small>Share to social</small></span></button>'+
+    '</div>'+
 
-    '<div class="body" style="margin-top:24px">'+
-      dev.body.map(function(p){ return "<p>"+bold(p)+"</p>"; }).join("")+'</div>'+
+    '<div class="content-card scripture-card">'+
+      '<div class="content-kicker">TODAY&#39;S WORD</div>'+
+      '<p class="verse">'+esc(dev.verse)+'</p>'+
+      '<div class="ref" style="margin-top:14px">'+esc(dev.ref)+' · BSB</div>'+
+    '</div>'+
 
-    '<div class="carry"><div class="tag">CARRY THIS</div><div class="line">'+dev.carry+'</div></div>'+
+    '<div class="content-card study-card"><div class="content-kicker">DEVOTIONAL</div>'+
+      '<div class="body" style="margin-top:14px">'+
+      dev.body.map(function(p){ return "<p>"+bold(p)+"</p>"; }).join("")+'</div></div>'+
 
-    '<div class="walk"><h3>THE WALK</h3><p>'+esc(dev.walk)+'</p>'+
+    '<div class="carry modern-carry"><div class="tag">CARRY THIS</div><div class="line">'+dev.carry+'</div></div>'+
+
+    '<div class="walk modern-walk"><h3>THE WALK</h3><p>'+esc(dev.walk)+'</p>'+
       (done
         ? '<div class="stamped"><div class="seal">&#10022; WALKED IT · DAY '+n+' &#10022;</div>'+
           '<div class="sub">'+getStreak()+'-DAY STREAK</div></div>'
         : '<button class="stamp-btn" id="walkBtn">MARK THE WALK DONE</button>')+
-      '<button class="cta ghost" data-openref="'+esc(dev.ref)+'">READ THE CHAPTER</button>'+
-      '<button class="cta ghost" data-cardref="'+esc(dev.ref)+'">MAKE A VERSE CARD</button>'+
     '</div>'+
 
-    '<div class="foot">NO FLUFF. JUST THE WORD AND THE WALK.</div></div>';
+    '<div class="foot">THE APPLIED WORD PODCAST</div></div>';
 }
 
 function spurgeonView(){
@@ -395,19 +421,21 @@ function parseSpurgeon(html){
    ============================================================ */
 function podcastView(){
   return '<div class="pad podcast-page">'+
-    '<div class="eyebrow">The Applied Word Podcast</div>'+
-    '<h1 style="font-size:34px">LISTEN <em>HERE</em></h1><div class="rule" style="margin-bottom:14px"></div>'+
-    '<div class="podcast-hero">'+
-      '<img src="assets/podcast-cover.png" alt="The Applied Word Podcast cover" class="podcast-cover">'+
-      '<div><div class="podcast-title">Sharpening the man through the Message.</div>'+
-      '<p class="muted">Play the weekly devotional without leaving the app, or open the show in Spotify.</p></div>'+
+    screenHead("Podcast","Listen to the latest weekly devotional")+
+    '<div class="podcast-showcase">'+
+      '<div class="podcast-art-shell"><img src="assets/podcast-cover.png" alt="The Applied Word Podcast cover" class="podcast-cover large"></div>'+
+      '<div class="podcast-meta">'+
+        '<div class="content-kicker">THE APPLIED WORD PODCAST</div>'+
+        '<div class="podcast-title-lg">Sharpening the man through the Message.</div>'+
+        '<p class="muted">Play the show right here, or jump out to Spotify and listen there.</p>'+
+      '</div>'+
     '</div>'+
     '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" '+
       'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
     '<a class="cta" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
     '<a class="cta ghost" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="follow">FOLLOW THE SHOW</a>'+
-    '<div class="where"><h4>PLAYER TROUBLE?</h4>'+
-      '<p class="muted">If your browser blocks the embedded player, open the show in Spotify with the button above.</p></div>'+
+    '<div class="content-card helper-card"><div class="content-kicker">LISTEN ANYWHERE</div>'+
+      '<p class="muted">If the embedded player is blocked by the browser, open the show in Spotify with the button above.</p></div>'+
     '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
@@ -432,11 +460,10 @@ function plansView(){
   if(!readings){
     body='<div class="empty"><h4>A DAY OFF THE CALENDAR</h4>'+
       "<p>M'Cheyne's calendar runs 365 days, so February 29 has no readings of its own. "+
-      'He told men who fell behind to either catch up on a quiet afternoon or skip ahead — '+
-      'use today for whichever you need.</p></div>';
+      'Use today to catch up or read ahead.</p></div>';
   } else {
     var mk=function(title, idxs){
-      return '<div class="stream"><h4>'+title+'</h4>'+
+      return '<div class="stream content-card"><h4>'+title+'</h4>'+
         idxs.map(function(i){
           var on=doneList.indexOf(i)>-1;
           return '<div class="rd'+(on?" done":"")+'" data-plan="'+i+'">'+
@@ -454,32 +481,30 @@ function plansView(){
   }
 
   return '<div class="pad">'+
-    '<div class="eyebrow">Reading plan</div>'+
-    '<div class="tabsel devotion-tabs" style="margin-top:10px">'+
+    screenHead("Reading Plan","M’Cheyne one-year plan")+
+    '<div class="tabsel devotion-tabs devotion-switch" style="margin-top:10px">'+
       '<button data-dev="today">TODAY</button>'+
       '<button class="on" data-dev="plan">PLAN</button>'+
     '</div>'+
-    '<h1 style="font-size:33px;margin-top:22px">M\u2019CHEYNE</h1><div class="rule" style="margin-bottom:12px"></div>'+
-    '<p class="muted">Robert Murray M\u2019Cheyne wrote this calendar for his church in Dundee in '+
-      'December 1842. Four chapters a day — two to read aloud with the house, two on your own. '+
-      'Finish the year and you\u2019ve read the Old Testament once, the New Testament and Psalms twice.</p>'+
+    '<div class="content-card helper-card" style="margin-top:14px"><p class="muted">Robert Murray M’Cheyne wrote this calendar for his church in Dundee in December 1842. Four chapters a day — two to read aloud with the house, two on your own.</p></div>'+
     '<div class="planbar"><input type="date" id="planDate" value="'+state.planDate+'"></div>'+
     body+
-    '<div class="foot">PUBLIC DOMAIN · ST. PETER\u2019S, DUNDEE, 1842</div></div>';
+    '<div class="foot">PUBLIC DOMAIN · ST. PETER’S, DUNDEE, 1842</div></div>';
 }
 
+/* ============================================================
+   BIBLE READER
 /* ============================================================
    BIBLE READER
    ============================================================ */
 function bibleView(){
   if(!anyInstalled()){
     return '<div class="pad">'+
-      '<div class="eyebrow">Complete offline Bible</div>'+
-      '<h1 style="font-size:34px">BIBLE <em>READER</em></h1><div class="rule"></div>'+
+      screenHead("Bible","Complete offline BSB reader")+
       '<div class="bible-install">'+
         '<div class="install-crest">✦</div>'+
         '<h3>BEREAN STANDARD BIBLE</h3>'+
-        '<p>The BSB text is included with the app. Download it to this device once, then the full Bible is available offline with highlights, notes, bookmarks, search, sharing, and verse cards.</p>'+
+        '<p>The BSB text is included with the app. Download it once, then the full Bible is available offline with highlights, notes, bookmarks, search, sharing, and verse images.</p>'+
         '<div class="bar" id="bar-bsb" style="display:none"><i></i></div>'+
         '<button class="cta" data-dl="bsb">DOWNLOAD BSB</button>'+
         '<div class="tier-meta">PUBLIC DOMAIN · 66 BOOKS · STORED ON THIS DEVICE</div>'+
@@ -493,7 +518,7 @@ function bibleView(){
 
   var verses=chapterVerses(state.book,state.chapter);
   if(!verses){
-    return '<div class="pad">'+readBar()+
+    return '<div class="pad">'+screenHead("Bible",BOOKS[state.book])+
       '<div class="loading"><i></i>OPENING '+esc(BOOKS[state.book]).toUpperCase()+'</div></div>';
   }
 
@@ -509,9 +534,12 @@ function bibleView(){
     '</div>';
   }).join("");
 
-  return '<div class="pad">'+readBar()+
+  return '<div class="pad bible-page">'+
+    screenHead("Bible",(state.meta[state.version]||{}).name||"Berean Standard Bible")+
+    '<button class="reader-search-btn" data-bview="search">&#9906; SEARCH BIBLE</button>'+
+    readBar()+
     '<div class="reader-tools">'+
-      '<button data-bview="search" aria-label="Search Bible">&#9906; SEARCH</button>'+
+      '<button data-bview="books" aria-label="Choose book">BOOKS</button>'+
       '<button data-font="-1" aria-label="Decrease text size">A−</button>'+
       '<button data-font="1" aria-label="Increase text size">A+</button>'+
       '<button data-mark="1" aria-label="Bookmark chapter">'+(marked?'★':'☆')+'</button>'+
@@ -519,7 +547,7 @@ function bibleView(){
     '<div class="chapter-title">'+esc(BOOKS[state.book])+' '+state.chapter+'</div>'+
     '<div class="chapter-sub">'+esc((state.meta[state.version]||{}).abbr||"BSB")+
       ' · '+verses.length+' VERSES'+(marked?' · BOOKMARKED':'')+'</div>'+
-    '<div class="reader-body" style="--reader-scale:'+state.fontScale+'">'+rows+'</div>'+
+    '<div class="reader-shell"><div class="reader-body" style="--reader-scale:'+state.fontScale+'">'+rows+'</div></div>'+
     '<div class="reader-end">'+
       '<button class="cta ghost" data-step="1">NEXT CHAPTER &#8250;</button>'+
     '</div>'+
@@ -543,10 +571,8 @@ function bibleSearchView(){
     rows='<div class="search-help">Search the entire BSB by reference or words. Examples: <b>John 3:16</b>, <b>fear of the Lord</b>, <b>be strong courageous</b>.</div>';
   }
   return '<div class="pad">'+
-    '<div class="readbar">'+
-      '<button class="nav" data-bview="read">&#8249;</button>'+
-      '<div class="readbar-title">SEARCH THE BIBLE</div>'+
-    '</div>'+
+    '<button class="backlink" data-bview="read">&#8249; BACK TO READER</button>'+
+    screenHead("Search Bible","Find a verse or phrase")+
     '<form class="bible-search" id="bibleSearchForm">'+
       '<input id="bibleSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Reference or words" value="'+esc(q)+'">'+
       '<button type="submit">SEARCH</button>'+
@@ -594,7 +620,7 @@ function readBar(){
   return '<div class="readbar">'+
     '<button class="nav" data-step="-1"'+(firstChap&&state.book===0?' disabled':'')+'>&#8249;</button>'+
     '<button data-bview="books">'+esc(BOOKS[state.book])+'</button>'+
-    '<button data-bview="chapters" style="flex:0 0 58px;text-align:center">'+state.chapter+'</button>'+
+    '<button data-bview="chapters" style="flex:0 0 68px;text-align:center">CH '+state.chapter+'</button>'+
     '<button class="nav" data-step="1"'+(lastChap&&state.book===65?' disabled':'')+'>&#8250;</button>'+
   '</div>';
 }
@@ -718,8 +744,7 @@ function historyView(){
 
   var body=t==="saved" ? savedHistoryRows() : activityRows();
   return '<div class="pad">'+
-    '<div class="eyebrow">Your activity</div>'+
-    '<h1 style="font-size:34px">HISTORY</h1><div class="rule" style="margin-bottom:6px"></div>'+
+    screenHead("History","Your reading and app activity")+
     '<div class="history-stats">'+
       '<div><b>'+getStreak()+'</b><span>STREAK</span></div>'+
       '<div><b>'+hlN+'</b><span>HIGHLIGHTS</span></div>'+
@@ -789,26 +814,22 @@ var RATIOS={ "9:16":[1080,1920], "4:5":[1080,1350], "1:1":[1080,1080] };
 function cardView(){
   var cv=state.cardVerse;
   if(!cv){
-    return '<div class="pad">'+
-      '<div class="eyebrow">Share it</div>'+
-      '<h1 style="font-size:34px">VERSE <em>CARDS</em></h1><div class="rule"></div>'+
+    return '<div class="pad">'+screenHead("Create Verse Image","Share a highlighted verse")+
       emptyBox("PICK A VERSE FIRST",
-        "Tap any verse while reading and choose Make card, or use the button on today\u2019s devotion.")+
+        "Tap any verse while reading and choose Card, or use the button on today’s devotion.")+
       '</div>';
   }
-  return '<div class="pad">'+
-    '<div class="eyebrow">Share it</div>'+
-    '<h1 style="font-size:34px">VERSE <em>CARD</em></h1><div class="rule" style="margin-bottom:4px"></div>'+
+  return '<div class="pad card-page">'+
+    screenHead("Create Verse Image",cv.ref+' · '+(cv.abbr||"BSB"))+
     '<div class="ratios">'+
-      '<button class="'+(state.cardRatio==="9:16"?"on":"")+'" data-ratio="9:16">9:16 · STORY</button>'+
-      '<button class="'+(state.cardRatio==="4:5"?"on":"")+'" data-ratio="4:5">4:5 · FEED</button>'+
-      '<button class="'+(state.cardRatio==="1:1"?"on":"")+'" data-ratio="1:1">1:1 · SQUARE</button>'+
+      '<button class="'+(state.cardRatio==="9:16"?"on":"")+'" data-ratio="9:16">9:16</button>'+
+      '<button class="'+(state.cardRatio==="4:5"?"on":"")+'" data-ratio="4:5">4:5</button>'+
+      '<button class="'+(state.cardRatio==="1:1"?"on":"")+'" data-ratio="1:1">1:1</button>'+
     '</div>'+
-    '<div class="cardprev"><canvas id="cardCanvas"></canvas></div>'+
+    '<div class="cardprev light-stage"><canvas id="cardCanvas"></canvas></div>'+
     '<button class="cta" data-savecard="1">SAVE TO PHOTOS</button>'+
-    '<p class="muted" style="margin-top:12px;font-size:12.5px">Saves a PNG at full Instagram '+
-      'resolution. On a phone this lands in your camera roll or Files, ready to post.</p>'+
-    '<div class="foot">'+esc(cv.ref)+' · '+esc(cv.abbr||"BSB")+'</div></div>';
+    '<p class="muted" style="margin-top:12px;font-size:12.5px">A full-resolution PNG is created for social posting. On iPhone, use the share sheet to save or post it.</p>'+
+    '<div class="foot">THE APPLIED WORD PODCAST</div></div>';
 }
 
 function drawCard(){
@@ -840,36 +861,21 @@ function drawCard(){
   function drawMark(cx,cy,s){
     x.save();
     x.translate(cx,cy);
-    x.strokeStyle="#D5B767";
-    x.fillStyle="rgba(39,24,17,.42)";
+    x.strokeStyle="#A47B33";
     x.lineCap="round"; x.lineJoin="round";
-    x.lineWidth=Math.max(2,s*.026);
-
-    // Shield.
+    x.lineWidth=Math.max(2,s*.02);
     x.beginPath();
-    x.moveTo(-s*.43,-s*.28); x.quadraticCurveTo(0,-s*.45,s*.43,-s*.28);
-    x.lineTo(s*.37,s*.20); x.quadraticCurveTo(s*.30,s*.48,0,s*.67);
-    x.quadraticCurveTo(-s*.30,s*.48,-s*.37,s*.20); x.closePath();
-    x.fill(); x.stroke();
-
-    // Sword.
-    x.lineWidth=Math.max(2,s*.022);
-    x.beginPath(); x.moveTo(0,-s*.58); x.lineTo(0,s*.42); x.stroke();
-    x.beginPath(); x.moveTo(-s*.16,-s*.24); x.lineTo(s*.16,-s*.24); x.stroke();
-    x.beginPath(); x.moveTo(0,-s*.68); x.lineTo(s*.055,-s*.57); x.lineTo(0,-s*.48); x.lineTo(-s*.055,-s*.57); x.closePath(); x.stroke();
-
-    // Open book.
-    x.beginPath();
-    x.moveTo(-s*.27,s*.06); x.quadraticCurveTo(-s*.14,-s*.02,-s*.02,s*.06); x.lineTo(-s*.02,s*.28); x.quadraticCurveTo(-s*.15,s*.20,-s*.27,s*.26); x.closePath();
-    x.moveTo(s*.27,s*.06); x.quadraticCurveTo(s*.14,-s*.02,s*.02,s*.06); x.lineTo(s*.02,s*.28); x.quadraticCurveTo(s*.15,s*.20,s*.27,s*.26); x.closePath();
+    x.moveTo(-s*.40,-s*.12); x.lineTo(-s*.18,-s*.24); x.lineTo(0,-s*.16); x.lineTo(s*.18,-s*.24); x.lineTo(s*.40,-s*.12);
+    x.lineTo(s*.40,s*.16); x.lineTo(0,s*.08); x.lineTo(-s*.40,s*.16); x.closePath();
     x.stroke();
-
-    // Compass star.
     x.beginPath();
-    x.arc(0,-s*.02,s*.19,0,Math.PI*2); x.stroke();
+    x.moveTo(0,-s*.48); x.lineTo(0,s*.02); x.stroke();
+    x.beginPath(); x.moveTo(-s*.12,-s*.30); x.lineTo(s*.12,-s*.30); x.stroke();
+    x.beginPath(); x.arc(0,-s*.18,s*.16,0,Math.PI*2); x.stroke();
+    x.beginPath(); x.moveTo(0,-s*.34); x.lineTo(s*.05,-s*.22); x.lineTo(s*.16,-s*.18); x.lineTo(s*.05,-s*.14); x.lineTo(0,-s*.02); x.lineTo(-s*.05,-s*.14); x.lineTo(-s*.16,-s*.18); x.lineTo(-s*.05,-s*.22); x.closePath(); x.stroke();
     x.beginPath();
-    x.moveTo(0,-s*.22); x.lineTo(s*.055,-s*.07); x.lineTo(s*.20,-s*.02); x.lineTo(s*.055,s*.03);
-    x.lineTo(0,s*.18); x.lineTo(-s*.055,s*.03); x.lineTo(-s*.20,-s*.02); x.lineTo(-s*.055,-s*.07); x.closePath();
+    x.moveTo(-s*.26,s*.18); x.quadraticCurveTo(-s*.12,s*.04,-s*.01,s*.16); x.lineTo(-s*.01,s*.34); x.quadraticCurveTo(-s*.13,s*.24,-s*.26,s*.30); x.closePath();
+    x.moveTo(s*.26,s*.18); x.quadraticCurveTo(s*.12,s*.04,s*.01,s*.16); x.lineTo(s*.01,s*.34); x.quadraticCurveTo(s*.13,s*.24,s*.26,s*.30); x.closePath();
     x.stroke();
     x.restore();
   }
@@ -886,98 +892,72 @@ function drawCard(){
     return lines;
   }
 
-  // Smooth coffee-brown leather, closer to the podcast cover.
-  x.fillStyle="#3B281F"; x.fillRect(0,0,W,H);
-  var leather=x.createLinearGradient(0,0,W,H);
-  leather.addColorStop(0,"rgba(118,79,55,.27)");
-  leather.addColorStop(.32,"rgba(76,47,34,.08)");
-  leather.addColorStop(.68,"rgba(34,22,17,.08)");
-  leather.addColorStop(1,"rgba(18,12,9,.32)");
-  x.fillStyle=leather; x.fillRect(0,0,W,H);
+  // Light parchment background.
+  x.fillStyle="#efe3cc"; x.fillRect(0,0,W,H);
+  var paper=x.createLinearGradient(0,0,0,H);
+  paper.addColorStop(0,"rgba(255,249,238,.65)");
+  paper.addColorStop(.18,"rgba(233,221,197,.42)");
+  paper.addColorStop(.55,"rgba(228,214,185,.18)");
+  paper.addColorStop(1,"rgba(212,193,156,.32)");
+  x.fillStyle=paper; x.fillRect(0,0,W,H);
 
-  var glow=x.createRadialGradient(W*.50,H*.38,0,W*.50,H*.38,Math.max(W,H)*.72);
-  glow.addColorStop(0,"rgba(172,117,78,.18)");
-  glow.addColorStop(.58,"rgba(96,59,42,.08)");
-  glow.addColorStop(1,"rgba(0,0,0,0)");
-  x.fillStyle=glow; x.fillRect(0,0,W,H);
-
-  // Fine deterministic leather grain.
-  for(var i=0;i<1300;i++){
+  for(var i=0;i<1600;i++){
     var rx=seeded(i*3)*W, ry=seeded(i*3+1)*H;
-    var alpha=.012+seeded(i*3+2)*.020;
-    x.fillStyle=(i%2?"rgba(255,239,210,":"rgba(15,8,5,")+alpha+")";
-    x.fillRect(rx,ry,1+seeded(i+50)*3,1+seeded(i+80)*1.6);
+    var alpha=.012+seeded(i*3+2)*.015;
+    x.fillStyle=(i%2?"rgba(255,255,255,":"rgba(135,110,78,")+alpha+")";
+    x.fillRect(rx,ry,1+seeded(i+50)*2.2,1+seeded(i+80)*1.4);
   }
+  var wash=x.createRadialGradient(W*.5,H*.42,0,W*.5,H*.42,Math.max(W,H)*.72);
+  wash.addColorStop(0,"rgba(255,255,255,.14)");
+  wash.addColorStop(.68,"rgba(191,157,103,.08)");
+  wash.addColorStop(1,"rgba(0,0,0,0)");
+  x.fillStyle=wash; x.fillRect(0,0,W,H);
 
-  // Vignette.
-  var vign=x.createRadialGradient(W/2,H/2,Math.min(W,H)*.18,W/2,H/2,Math.max(W,H)*.78);
-  vign.addColorStop(.60,"rgba(0,0,0,0)");
-  vign.addColorStop(1,"rgba(11,7,5,.42)");
-  x.fillStyle=vign; x.fillRect(0,0,W,H);
+  var gold="#b38840", goldDeep="#7b5a24", ink="#3e2d1f", line="#c6a15d";
+  var outer=W*.05, inner=W*.068;
+  roundedRect(outer,outer,W-outer*2,H-outer*2,W*.02);
+  x.strokeStyle="rgba(182,136,64,.55)"; x.lineWidth=Math.max(2,W*.0026); x.stroke();
+  roundedRect(inner,inner,W-inner*2,H-inner*2,W*.016);
+  x.strokeStyle="rgba(198,161,93,.72)"; x.lineWidth=Math.max(1.6,W*.0018); x.stroke();
 
-  var gold="#D4B566", goldLight="#E5CE8D", goldDark="#92723A";
-  var outer=W*.055, inner=W*.072;
+  function corner(x0,y0,flipX,flipY){
+    x.save(); x.translate(x0,y0); x.scale(flipX,flipY); x.strokeStyle="rgba(182,136,64,.8)"; x.lineWidth=Math.max(1.6,W*.0016);
+    x.beginPath(); x.moveTo(0,28); x.quadraticCurveTo(0,0,28,0); x.moveTo(8,28); x.quadraticCurveTo(8,8,28,8); x.stroke();
+    x.restore();
+  }
+  corner(outer+12,outer+12,1,1); corner(W-outer-12,outer+12,-1,1); corner(outer+12,H-outer-12,1,-1); corner(W-outer-12,H-outer-12,-1,-1);
 
-  // Embossed double border.
-  roundedRect(outer,outer,W-outer*2,H-outer*2,W*.025);
-  x.strokeStyle="rgba(223,193,114,.58)"; x.lineWidth=Math.max(2,W*.003); x.stroke();
-  roundedRect(inner,inner,W-inner*2,H-inner*2,W*.020);
-  x.strokeStyle="rgba(112,81,46,.78)"; x.lineWidth=Math.max(2,W*.0023); x.stroke();
-
-  // Antique corner protectors.
-  var cs=W*.075;
-  x.fillStyle="rgba(177,139,68,.72)";
-  x.beginPath(); x.moveTo(outer,outer); x.lineTo(outer+cs,outer); x.lineTo(outer,outer+cs); x.closePath(); x.fill();
-  x.beginPath(); x.moveTo(W-outer,outer); x.lineTo(W-outer-cs,outer); x.lineTo(W-outer,outer+cs); x.closePath(); x.fill();
-  x.beginPath(); x.moveTo(outer,H-outer); x.lineTo(outer+cs,H-outer); x.lineTo(outer,H-outer-cs); x.closePath(); x.fill();
-  x.beginPath(); x.moveTo(W-outer,H-outer); x.lineTo(W-outer-cs,H-outer); x.lineTo(W-outer,H-outer-cs); x.closePath(); x.fill();
-
-  // Kicker + crest + brand.
   x.textAlign="center"; x.textBaseline="middle";
-  x.fillStyle=goldLight;
-  x.font="500 "+Math.round(W*.018)+"px 'JetBrains Mono', monospace";
-  x.fillText("A WEEKLY DEVOTIONAL FOR MEN",W/2,H*(shortCard?.105:.075));
-
-  var markY=H*(shortCard?.19:.155), markS=W*(shortCard?.115:.13);
-  drawMark(W/2,markY,markS);
-
-  var brandY=H*(shortCard?.29:.245);
   x.fillStyle=gold;
-  x.shadowColor="rgba(18,10,7,.55)"; x.shadowBlur=W*.008; x.shadowOffsetY=W*.004;
-  x.font="700 "+Math.round(W*.030)+"px 'Roboto Slab', Georgia, serif";
-  x.fillText("THE APPLIED WORD PODCAST",W/2,brandY);
-  x.shadowColor="transparent"; x.shadowBlur=0; x.shadowOffsetY=0;
-  x.strokeStyle="rgba(212,181,102,.72)"; x.lineWidth=Math.max(2,W*.0024);
-  x.beginPath(); x.moveTo(W*.26,brandY+W*.037); x.lineTo(W*.74,brandY+W*.037); x.stroke();
+  x.font="600 "+Math.round(W*.023)+"px 'JetBrains Mono', monospace";
+  x.fillText("THE APPLIED WORD PODCAST",W/2,H*(shortCard?.08:.072));
+  drawMark(W/2,H*(shortCard?.16:.135),W*(shortCard?.10:.115));
 
-  // Verse block — antique gold serif, centered like the updated cover art.
-  var pad=W*.13, maxW=W-pad*2;
-  var size=Math.round(W*(shortCard?.052:.058));
-  var maxBlock=H*(shortCard?.36:.40), lines=wrappedLines(cv.text,maxW,size,"700","");
-  while(lines.length*size*1.34>maxBlock && size>Math.round(W*.031)){
+  var pad=W*.12, maxW=W-pad*2;
+  var size=Math.round(W*(shortCard?.050:.056));
+  var maxBlock=H*(shortCard?.42:.44), lines=wrappedLines(cv.text,maxW,size,"700","");
+  while(lines.length*size*1.34>maxBlock && size>Math.round(W*.03)){
     size-=Math.max(2,Math.round(W*.0028));
     lines=wrappedLines(cv.text,maxW,size,"700","");
   }
   var lineH=size*1.34, blockH=lines.length*lineH;
-  var verseCenter=H*(shortCard?.56:.565), startY=verseCenter-blockH/2+lineH*.48;
-  x.font="700 "+size+"px 'Lora', Georgia, serif";
-  x.fillStyle=goldLight;
-  x.textAlign="center";
-  x.shadowColor="rgba(27,16,11,.68)"; x.shadowBlur=W*.006; x.shadowOffsetY=W*.003;
+  var verseCenter=H*(shortCard?.53:.55), startY=verseCenter-blockH/2+lineH*.48;
+  x.font="700 "+size+"px 'Roboto Slab', Georgia, serif";
+  x.fillStyle=ink;
+  x.shadowColor="rgba(255,255,255,.35)"; x.shadowBlur=W*.005; x.shadowOffsetY=0;
   for(var k=0;k<lines.length;k++) x.fillText(lines[k],W/2,startY+k*lineH);
-  x.shadowColor="transparent"; x.shadowBlur=0; x.shadowOffsetY=0;
+  x.shadowColor="transparent"; x.shadowBlur=0;
 
-  // Reference and footer.
-  var refY=Math.min(H*(shortCard?.805:.80), startY+blockH+W*.07);
-  x.strokeStyle="rgba(212,181,102,.82)"; x.lineWidth=Math.max(2,W*.0025);
-  x.beginPath(); x.moveTo(W*.33,refY-W*.035); x.lineTo(W*.67,refY-W*.035); x.stroke();
-  x.fillStyle=gold;
-  x.font="700 "+Math.round(W*.029)+"px 'JetBrains Mono', monospace";
-  x.fillText(cv.ref.toUpperCase()+" · "+(cv.abbr||"BSB"),W/2,refY);
+  var refY=Math.min(H*(shortCard?.80:.82), startY+blockH+W*.085);
+  x.strokeStyle="rgba(182,136,64,.72)"; x.lineWidth=Math.max(2,W*.0021);
+  x.beginPath(); x.moveTo(W*.30,refY-W*.032); x.lineTo(W*.70,refY-W*.032); x.stroke();
+  x.fillStyle=goldDeep;
+  x.font="700 "+Math.round(W*.028)+"px 'JetBrains Mono', monospace";
+  x.fillText(cv.ref.toUpperCase(),W/2,refY);
 
-  x.fillStyle="rgba(229,206,141,.86)";
-  x.font="italic "+Math.round(W*.025)+"px 'Lora', Georgia, serif";
-  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.91:.91));
+  x.fillStyle="rgba(123,90,36,.88)";
+  x.font="italic "+Math.round(W*.023)+"px 'Lora', Georgia, serif";
+  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.90:.92));
 }
 
 function saveCard(){
@@ -1103,7 +1083,7 @@ function render(){
   scr.innerHTML=screenHTML();
   scr.scrollTop=keepScroll;
 
-  $("streakN").textContent=getStreak();
+  var streakEl=$("streakN"); if(streakEl) streakEl.textContent=getStreak();
 
   [].forEach.call(document.querySelectorAll("nav button"),function(b){
     var on = b.dataset.tab===state.tab ||
@@ -1128,10 +1108,7 @@ function wire(scr){
     b.onclick=function(){ state.tab=b.dataset.go; render(); };
   });
   on(scr,"[data-dev]",function(b){
-    b.onclick=function(){
-      state.devMode=b.dataset.dev;
-      if(state.devMode==="spurgeon" && !state.spData) loadSpurgeon(); else render();
-    };
+    b.onclick=function(){ state.devMode=b.dataset.dev; render(); };
   });
   on(scr,"[data-half]",function(b){
     b.onclick=function(){ state.spHalf=b.dataset.half; loadSpurgeon(); };
@@ -1407,6 +1384,131 @@ function initSheet(){
   };
 }
 
+/* ---------- temporary install promotion ---------- */
+var deferredInstallPrompt=null;
+var installFabTimer=null;
+
+function isStandaloneApp(){
+  return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true;
+}
+function isIOSDevice(){
+  var ua=navigator.userAgent||"";
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+}
+function isAndroidDevice(){ return /Android/i.test(navigator.userAgent||""); }
+function isIOSSafari(){
+  var ua=navigator.userAgent||"";
+  return isIOSDevice() && /Safari/i.test(ua) && !/(CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo)/i.test(ua);
+}
+function installDismissed(){
+  try{ return sessionStorage.getItem("tawInstallDismissed")==="1"; }catch(e){ return false; }
+}
+function setInstallDismissed(){
+  try{ sessionStorage.setItem("tawInstallDismissed","1"); }catch(e){}
+}
+function hideInstallFab(){
+  var fab=$("installFab");
+  if(fab) fab.hidden=true;
+  clearTimeout(installFabTimer);
+}
+function showInstallFab(){
+  var fab=$("installFab");
+  if(!fab || isStandaloneApp() || installDismissed()) return;
+  if(!(isIOSDevice() || isAndroidDevice() || deferredInstallPrompt)) return;
+  // This is intentionally a temporary floating promotion: it disappears
+  // after installation or when dismissed for the current browser session.
+  clearTimeout(installFabTimer);
+  installFabTimer=setTimeout(function(){
+    if(!isStandaloneApp() && !installDismissed()) fab.hidden=false;
+  },900);
+}
+function closeInstallGuide(){
+  var overlay=$("installOverlay");
+  if(overlay) overlay.hidden=true;
+}
+function installStep(n,icon,title,copy){
+  return '<div class="install-step"><span class="install-step-num">'+n+'</span>'+
+    '<span class="install-step-icon">'+icon+'</span><span><b>'+title+'</b><small>'+copy+'</small></span></div>';
+}
+function openInstallGuide(){
+  var overlay=$("installOverlay"), guide=$("installGuide"), title=$("installTitle");
+  if(!overlay||!guide||!title) return;
+  if(isIOSDevice()){
+    title.textContent="Add to iPhone Home Screen";
+    guide.innerHTML=(isIOSSafari()?"":'<div class="install-notice"><b>Open this page in Safari first.</b><span>iPhone installs web apps from Safari.</span></div>')+
+      installStep("1","↗","Tap Share","In Safari, tap Share. With Compact tabs, tap More first, then Share.")+
+      installStep("2","＋","Add to Home Screen","Scroll down and choose Add to Home Screen. If it is hidden, use Edit Actions.")+
+      installStep("3","✓","Open as Web App","Turn on Open as Web App, then tap Add.");
+  } else if(isAndroidDevice()){
+    title.textContent="Install on Android";
+    guide.innerHTML=deferredInstallPrompt
+      ? '<div class="install-notice ready"><b>Ready to install.</b><span>Tap the gold Install button below to use your browser’s native install prompt.</span></div><button id="installNativeBtn" class="cta install-native" type="button">INSTALL THE APP</button>'
+      : installStep("1","⋮","Open the browser menu","In Chrome or your Android browser, tap the menu button.")+
+        installStep("2","↓","Choose Install app","Depending on the browser it may say Install app or Add to Home screen.")+
+        installStep("3","✓","Confirm Install","The Applied Word Podcast will appear with your other apps.");
+  } else {
+    title.textContent="Install The Applied Word Podcast";
+    guide.innerHTML=deferredInstallPrompt
+      ? '<div class="install-notice ready"><b>This browser can install the app.</b><span>Use the button below to continue.</span></div><button id="installNativeBtn" class="cta install-native" type="button">INSTALL THE APP</button>'
+      : '<div class="install-notice"><b>Use your browser’s install option.</b><span>Look for Install app or Add to Home screen in the browser menu.</span></div>';
+  }
+  overlay.hidden=false;
+  var nativeBtn=$("installNativeBtn");
+  if(nativeBtn) nativeBtn.onclick=triggerNativeInstall;
+}
+async function triggerNativeInstall(){
+  if(!deferredInstallPrompt){ openInstallGuide(); return; }
+  closeInstallGuide();
+  hideInstallFab();
+  try{
+    deferredInstallPrompt.prompt();
+    var choice=await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt=null;
+    if(choice && choice.outcome==="accepted"){
+      setInstallDismissed();
+      toast("App installed");
+    } else {
+      setInstallDismissed();
+    }
+  }catch(e){
+    deferredInstallPrompt=null;
+    openInstallGuide();
+  }
+}
+function initInstallPromotion(){
+  var fab=$("installFab"), fabClose=$("installFabClose"), close=$("installClose"), overlay=$("installOverlay");
+  if(!fab) return;
+  if(isStandaloneApp()){ hideInstallFab(); return; }
+
+  fab.onclick=function(e){
+    if(e.target===fabClose) return;
+    if(deferredInstallPrompt) triggerNativeInstall();
+    else openInstallGuide();
+  };
+  if(fabClose) fabClose.onclick=function(e){
+    e.preventDefault(); e.stopPropagation(); setInstallDismissed(); hideInstallFab();
+  };
+  if(close) close.onclick=closeInstallGuide;
+  if(overlay) overlay.onclick=function(e){ if(e.target===overlay) closeInstallGuide(); };
+  showInstallFab();
+}
+
+window.addEventListener("beforeinstallprompt",function(e){
+  e.preventDefault();
+  deferredInstallPrompt=e;
+  showInstallFab();
+});
+window.addEventListener("appinstalled",function(){
+  deferredInstallPrompt=null;
+  setInstallDismissed();
+  hideInstallFab();
+  closeInstallGuide();
+});
+if(window.matchMedia){
+  var standaloneQuery=window.matchMedia("(display-mode: standalone)");
+  if(standaloneQuery.addEventListener) standaloneQuery.addEventListener("change",function(e){ if(e.matches) hideInstallFab(); });
+}
+
 /* ---------- boot ---------- */
 [].forEach.call(document.querySelectorAll("nav button"),function(b){
   b.onclick=function(){
@@ -1421,6 +1523,7 @@ var settingsBtn=$("settingsBtn");
 if(settingsBtn) settingsBtn.onclick=function(){ state.tab="settings"; render(); };
 
 initSheet();
+initInstallPromotion();
 
 refreshMeta()
   .then(function(){

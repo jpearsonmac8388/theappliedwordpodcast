@@ -11,6 +11,14 @@ This is a static, installable PWA for **The Applied Word Podcast**. It has no bu
 
 Settings are available from the gear button in the header.
 
+## Install prompt
+
+A temporary floating **Install App** button is included for mobile browsers. It disappears when the app is installed or when the user dismisses it for the current browser session.
+
+- **Android / Chromium:** the app captures `beforeinstallprompt` and launches the browser's native install confirmation when it is available. If the browser has not made the native prompt available yet, the button shows manual Install app / Add to Home screen instructions.
+- **iPhone / iPad:** Safari does not expose the Chromium install prompt, so the button shows Apple's Add to Home Screen flow: Share → Add to Home Screen → Open as Web App → Add. If the page is open in another iOS browser, the guide tells the user to open it in Safari first.
+- The install promotion is hidden automatically in standalone / installed mode.
+
 ## Bible reader
 
 The app includes the official Berean Standard Bible plain-text file at:
@@ -60,7 +68,7 @@ No build command is required. Set the output directory to the repository root.
 
 ## Brand assets
 
-- `assets/podcast-cover.png` — supplied The Applied Word Podcast artwork used on the Podcast tab
+- `assets/podcast-cover.png` — supplied Applied Word artwork used on the Podcast tab
 - `icons/icon-master.svg` — editable app-icon source
 - `icons/icon-192.png`
 - `icons/icon-512.png`

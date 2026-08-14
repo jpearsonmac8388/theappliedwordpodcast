@@ -29,24 +29,33 @@
 <body>
 <div id="ember"></div>
 
-<header>
-  <div class="brand-lockup">
-    <img src="icons/icon-192.png" alt="" class="brand-icon">
-    <div class="wordmark">The Applied Word Podcast</div>
+<header class="app-header">
+  <div class="header-spacer" aria-hidden="true"></div>
+  <div class="brand-stack" aria-label="The Applied Word Podcast">
+    <div class="brand-kicker">THE</div>
+    <div class="wordmark">APPLIED WORD</div>
+    <div class="brand-sub"><span></span>PODCAST<span></span></div>
   </div>
-  <div class="header-tools">
-    <div class="streak" aria-label="Current devotional streak"><i class="flame"></i> <span id="streakN">0</span> DAYS</div>
-    <button id="settingsBtn" class="icon-btn" aria-label="Open settings" title="Settings">&#9881;</button>
-  </div>
+  <button id="settingsBtn" class="icon-btn" aria-label="Open settings" title="Settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="M19 13.2v-2.4l-2-.6a7.7 7.7 0 0 0-.7-1.6l1-1.9-1.7-1.7-1.9 1a7.7 7.7 0 0 0-1.6-.7l-.6-2H9.1l-.6 2a7.7 7.7 0 0 0-1.6.7L5 5 3.3 6.7l1 1.9a7.7 7.7 0 0 0-.7 1.6l-2 .6v2.4l2 .6c.2.6.4 1.1.7 1.6l-1 1.9L5 19l1.9-1c.5.3 1 .5 1.6.7l.6 2h2.4l.6-2c.6-.2 1.1-.4 1.6-.7l1.9 1 1.7-1.7-1-1.9c.3-.5.5-1 .7-1.6l2-.6Z"/></svg>
+  </button>
 </header>
 
 <main id="screen" aria-live="polite"></main>
 
 <nav aria-label="Primary navigation">
-  <button data-tab="devotion" class="on"><i>&#10022;</i><span>DEVOTION</span></button>
-  <button data-tab="podcast"><i>&#9654;</i><span>PODCAST</span></button>
-  <button data-tab="bible"><i>&#9636;</i><span>BIBLE</span></button>
-  <button data-tab="history"><i>&#8635;</i><span>HISTORY</span></button>
+  <button data-tab="devotion" class="on">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.2c3.6-.8 6.3-.2 8.5 1.7v12c-2.2-1.8-4.9-2.4-8.5-1.6V5.2Z"/><path d="M20.5 5.2c-3.6-.8-6.3-.2-8.5 1.7v12c2.2-1.8 4.9-2.4 8.5-1.6V5.2Z"/></svg></i><span>DEVOTION</span>
+  </button>
+  <button data-tab="podcast">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></svg></i><span>PODCAST</span>
+  </button>
+  <button data-tab="bible">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.2c3.6-.8 6.3-.2 8.5 1.7v12c-2.2-1.8-4.9-2.4-8.5-1.6V5.2Z"/><path d="M20.5 5.2c-3.6-.8-6.3-.2-8.5 1.7v12c2.2-1.8 4.9-2.4 8.5-1.6V5.2Z"/><path d="M9 10.2h2.2M10.1 9.1v2.2"/></svg></i><span>BIBLE</span>
+  </button>
+  <button data-tab="history">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3.4 2"/></svg></i><span>HISTORY</span>
+  </button>
 </nav>
 
 <div id="scrim"></div>
@@ -75,6 +84,23 @@
   </div>
 
   <textarea id="sheetNote" placeholder="What did you see in this verse?"></textarea>
+</div>
+
+<button id="installFab" class="install-fab" type="button" aria-label="Install The Applied Word Podcast" hidden>
+  <span class="install-fab-icon" aria-hidden="true">↓</span>
+  <span>INSTALL APP</span>
+  <span id="installFabClose" class="install-fab-close" role="button" aria-label="Dismiss install button">×</span>
+</button>
+
+<div id="installOverlay" class="install-overlay" hidden>
+  <section id="installPanel" class="install-panel" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+    <div class="install-panel-head">
+      <img src="icons/icon-192.png" alt="" class="install-panel-icon">
+      <div><div class="install-eyebrow">THE APPLIED WORD PODCAST</div><h2 id="installTitle">Install this app</h2></div>
+      <button id="installClose" class="install-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="installGuide" class="install-guide"></div>
+  </section>
 </div>
 
 <div id="toast" role="status"></div>
