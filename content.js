@@ -1,5 +1,5 @@
 /* ============================================================
-   THE APPLIED WORD PODCAST — devotions
+   THE APPLIED WORD — devotions
    Edit this file to change what men read. The app shows one per
    day and loops. Copy a block, change the words, done.
 
@@ -316,23 +316,17 @@ window.DEVOTIONS = [
 
 /* ============================================================
    SPURGEON — Morning and Evening (1866), public domain.
-
-   Static-host friendly: the app downloads the complete public-domain
-   dataset from GitHub once and keeps it in IndexedDB for future/offline
-   use. The existing /spurgeon proxy remains as a fallback for hosts that
-   support server-side functions.
+   Looked up live per date from the Christian Classics Ethereal
+   Library through the /spurgeon proxy, so all 732 readings are
+   reachable without shipping any of them inside the app.
    ============================================================ */
 window.SPURGEON = {
-  datasetUrl: "https://raw.githubusercontent.com/russianryebread/morning-and-evening/refs/heads/master/m_e.json",
   page: function (month, day, half) {
     var mm = String(month).length < 2 ? "0" + month : String(month);
     var dd = String(day).length < 2 ? "0" + day : String(day);
     return "/spurgeon/morneve.d" + mm + dd + (half === "evening" ? "pm" : "am") + ".html";
   },
   sourceUrl: function (month, day, half) {
-    var mm = String(month).length < 2 ? "0" + month : String(month);
-    var dd = String(day).length < 2 ? "0" + day : String(day);
-    return "https://ccel.org/ccel/spurgeon/morneve/morneve.d" + mm + dd +
-      (half === "evening" ? "pm" : "am") + ".html";
+    return "https://ccel.org/ccel/spurgeon/" + this.page(month, day, half).replace("/spurgeon/", "");
   }
 };
