@@ -153,17 +153,11 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 
 This remains a static PWA. Browser notification permission lets the app show OS notifications while it is active, and the service worker can display notifications when invoked. Reliable push delivery while the app is fully closed requires a web-push sender/backend (or another push service) to send Push API messages to subscribed devices. The Monday podcast alert in this static build therefore uses the known release schedule and is checked by the app rather than polling Spotify in the background.
 
-## v24 — true podcast push + reading plan polish
-
-- Added a deployable `push-worker/` backend for true new-episode detection and Web Push.
-- The Worker checks the Spotify show ID for the newest episode every five minutes and pushes only when the episode ID changes.
-- Added a Push Service URL / Connect workflow in Settings.
-- The Podcast tab can display the latest episode returned by the push backend.
-- Reworked the M’Cheyne Reading Plan so users can choose a start date and one of three tracks: Complete (4/day), Family (2/day), or Personal (2/day).
-- Reading-plan configuration and progress are included in the JSON backup.
-- Added a daily reading reminder and a dedicated Reading Plan reset in Settings.
-- Fixed note-editor save actions so they remain above the bottom navigation.
-- Reduced excess height in the header and bottom app bar.
-- Increased internal padding across Settings and other card surfaces.
-- Reworked prayer entry into a temporary composer that clears after Save or Cancel.
-- When the push backend is connected, the selected M’Cheyne reading reminder is also synchronized for closed-app Web Push; otherwise the app falls back to its local reminder checker.
+## v25 updates
+- Cleaned up the M’Cheyne Reading Plan controls and replaced the old track selector with **1 Year** and **6 Month** plans. The 6 Month option combines two consecutive M’Cheyne calendar days per app day.
+- Tightened the reading-reminder time control and replaced the ambiguous View Date box with a centered Reading Date navigator.
+- Increased bottom-navigation icon and label sizes slightly without making the bar bulky.
+- Switched new-episode detection from Spotify Web API credentials to the built-in Anchor/Spotify for Creators RSS feed. Listener UI now only exposes Turn On / Turn Off; the push Worker URL is an owner-side deployment setting in `push-config.js`.
+- Increased the verse-card logo while preserving border clearance, enlarged the Scripture reference/translation, added a clearer Justin McFadden credit, and increased/raised the tagline.
+- Reworked Prayer Requests into preview cards with category, preview, reminder status, and Mark Answered. Tapping a card opens a dedicated full prayer editor.
+- Replaced the visible Markdown editor workflow with a compact one-line rich-text toolbar supporting bold, italic, underline, heading, bullets, numbering, checklist insertion, quote, undo, and redo.

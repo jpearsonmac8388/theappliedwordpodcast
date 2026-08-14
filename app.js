@@ -169,15 +169,17 @@ var state = {
   latestEpisode: null,
   latestEpisodeFetched: 0,
   prayerComposer: false,
+  prayerId: null,
   prayerDraft: "",
   prayerDraftCategory: "Personal"
 };
 try{
   var initialParams=new URLSearchParams(location.search);
-  var initialTab=initialParams.get("tab"), initialSection=initialParams.get("section"), initialNote=initialParams.get("note");
+  var initialTab=initialParams.get("tab"), initialSection=initialParams.get("section"), initialNote=initialParams.get("note"), initialPrayer=initialParams.get("prayer");
   if(["devotion","podcast","bible","notes","history"].indexOf(initialTab)>-1) state.tab=initialTab;
   if(["sermon","prayer","study","men"].indexOf(initialSection)>-1) state.noteSection=initialSection;
   if(initialNote) state.noteId=initialNote;
+  if(initialPrayer) state.prayerId=initialPrayer;
   if(initialParams.get("plan")==="1"){ state.tab="devotion"; state.devMode="plan"; }
 }catch(e){}
 
@@ -229,7 +231,7 @@ function notificationPrefs(){
 function saveNotificationPrefs(p){ jset("notificationPrefs",p||{}); }
 function pushServiceUrl(){
   var p=notificationPrefs(), configured=(typeof window!=="undefined"&&window.TAW_PUSH_SERVICE_URL)?window.TAW_PUSH_SERVICE_URL:"";
-  var url=String(p.pushServiceUrl||configured||"").trim();
+  var url=String(configured||p.pushServiceUrl||"").trim();
   return url.replace(/\/+$/g,"");
 }
 function savePushServiceUrl(url){
@@ -254,12 +256,12 @@ function pushFetch(path,opts){
 }
 function pushConnectionLabel(){
   var p=notificationPrefs();
-  if(!pushServiceUrl()) return "Not configured";
-  if(!pushSupported()) return "Push not supported here";
-  return p.pushConnected?"Connected for true push":"Service configured · not subscribed";
+  if(!pushSupported()) return "Push is not supported on this browser";
+  if(!pushServiceUrl()) return "Push service is not deployed for this build";
+  return p.pushConnected?"New episode alerts are on":"Ready to turn on";
 }
 function connectPushService(){
-  if(!pushServiceUrl()) return Promise.reject(new Error("Enter the push service URL first"));
+  if(!pushServiceUrl()) return Promise.reject(new Error("Podcast push is not configured in this build"));
   if(!pushSupported()) return Promise.reject(new Error("Push notifications are not supported in this browser"));
   return ensureNotificationPermission().then(function(permission){
     if(permission!=="granted") throw new Error("Notification permission was not granted");
@@ -273,7 +275,7 @@ function connectPushService(){
     });
   }).then(function(sub){
     var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
-    return pushFetch("/subscribe",{method:"POST",body:JSON.stringify({subscription:payload,preferences:pushReadingPreferences()})}).then(function(){ return sub; });
+    return pushFetch("/subscribe",{method:"POST",body:JSON.stringify({subscription:payload,preferences:Object.assign(pushReadingPreferences(),{podcast:true})})}).then(function(){ return sub; });
   }).then(function(){
     var p=notificationPrefs(); p.podcast=true; p.pushConnected=true; saveNotificationPrefs(p);
     return loadLatestEpisode(true).catch(function(){}).then(function(){ return true; });
@@ -293,7 +295,7 @@ function disconnectPushService(){
   });
 }
 function loadLatestEpisode(force){
-  if(!pushServiceUrl()) return Promise.reject(new Error("Push service not configured"));
+  if(!pushServiceUrl()) return Promise.reject(new Error("Podcast push is not configured in this build"));
   if(!force && state.latestEpisode && Date.now()-(state.latestEpisodeFetched||0)<300000) return Promise.resolve(state.latestEpisode);
   return pushFetch("/latest").then(function(data){
     state.latestEpisode=data.episode||null; state.latestEpisodeFetched=Date.now();
@@ -304,7 +306,7 @@ function loadLatestEpisode(force){
 function pushReadingPreferences(){
   var s=planSettings();
   var tz="UTC"; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"; }catch(e){}
-  return {readingReminder:{enabled:!!s.reminderEnabled,time:s.reminderTime||"07:00",startDate:s.startDate||"",timezone:tz}};
+  return {podcast:!!notificationPrefs().podcast,readingReminder:{enabled:!!s.reminderEnabled,time:s.reminderTime||"07:00",startDate:s.startDate||"",duration:s.duration||"year",timezone:tz}};
 }
 function syncPushPreferences(){
   var prefs=notificationPrefs(); if(!prefs.pushConnected || !pushServiceUrl() || !("serviceWorker" in navigator)) return Promise.resolve(false);
@@ -317,12 +319,15 @@ function syncPushPreferences(){
 
 function defaultPlanSettings(){
   var y=new Date().getFullYear();
-  return {startDate:y+"-01-01",mode:"complete",reminderEnabled:false,reminderTime:"07:00",lastReminderKey:""};
+  return {startDate:y+"-01-01",duration:"year",reminderEnabled:false,reminderTime:"07:00",lastReminderKey:""};
 }
 function planSettings(){
   var d=defaultPlanSettings(), s=jget("mcheynePlanSettings",{});
   if(!s.startDate) s.startDate=d.startDate;
-  if(["complete","family","personal"].indexOf(s.mode)<0) s.mode="complete";
+  // v24 used complete/family/personal. Migrate those cleanly to the standard 1-year plan.
+  if(!s.duration){ s.duration=(s.mode&&s.mode!=="complete")?"year":"year"; }
+  if(["year","sixmonth"].indexOf(s.duration)<0) s.duration="year";
+  delete s.mode;
   if(typeof s.reminderEnabled!=="boolean") s.reminderEnabled=false;
   if(!/^\d{2}:\d{2}$/.test(s.reminderTime||"")) s.reminderTime="07:00";
   if(typeof s.lastReminderKey!=="string") s.lastReminderKey="";
@@ -338,32 +343,40 @@ function mcheyneDays(){
   return out;
 }
 function dateAtNoon(str){ var p=String(str||"").split("-"); return new Date(+p[0],(+p[1]||1)-1,+p[2]||1,12,0,0,0); }
-function planDayForDate(dateStr){
+function planDurationLabel(duration){ return duration==="sixmonth"?"6 Month Plan":"1 Year Plan"; }
+function planReadingsPerDay(duration){ return duration==="sixmonth"?8:4; }
+function planCalendarDays(duration){ return duration==="sixmonth"?Math.ceil(mcheyneDays().length/2):mcheyneDays().length; }
+function planBundleForDate(dateStr){
   var s=planSettings(), start=dateAtNoon(s.startDate), target=dateAtNoon(dateStr);
-  var idx=Math.round((target-start)/86400000);
-  var days=mcheyneDays();
-  if(idx<0 || idx>=days.length) return {index:idx,day:null,total:days.length};
-  return {index:idx,day:days[idx],total:days.length};
+  var elapsed=Math.round((target-start)/86400000), days=mcheyneDays();
+  if(elapsed<0) return {index:elapsed,items:[],total:planCalendarDays(s.duration)};
+  var sourceStart=s.duration==="sixmonth"?elapsed*2:elapsed;
+  if(sourceStart>=days.length) return {index:elapsed,items:[],total:planCalendarDays(s.duration)};
+  var count=s.duration==="sixmonth"?2:1, items=[], slot=0;
+  for(var x=0;x<count;x++){
+    var source=days[sourceStart+x]; if(!source) continue;
+    for(var r=0;r<source.readings.length;r++) items.push({slot:slot++,ref:source.readings[r],sourceDay:sourceStart+x+1,month:source.month});
+  }
+  return {index:elapsed,items:items,total:planCalendarDays(s.duration),sourceStart:sourceStart};
 }
-function planIndexesForMode(mode){ return mode==="family"?[0,1]:mode==="personal"?[2,3]:[0,1,2,3]; }
-function planModeLabel(mode){ return mode==="family"?"Family readings":mode==="personal"?"Personal readings":"Complete classic plan"; }
 function planProgressStats(){
-  var done=planDone(), s=planSettings(), start=dateAtNoon(s.startDate), req=planIndexesForMode(s.mode), days=mcheyneDays(), completed=0, readings=0;
+  var done=planDone(), s=planSettings(), start=dateAtNoon(s.startDate), totalDays=planCalendarDays(s.duration), completed=0, readings=0;
   Object.keys(done).forEach(function(date){
-    var idx=Math.round((dateAtNoon(date)-start)/86400000); if(idx<0||idx>=days.length) return;
-    var list=done[date]||[], hit=req.filter(function(i){return list.indexOf(i)>-1;}).length;
-    readings+=hit; if(hit===req.length) completed++;
+    var elapsed=Math.round((dateAtNoon(date)-start)/86400000); if(elapsed<0||elapsed>=totalDays) return;
+    var bundle=planBundleForDate(date), list=done[date]||[], needed=bundle.items.map(function(i){return i.slot;});
+    var hit=needed.filter(function(i){return list.indexOf(i)>-1;}).length;
+    readings+=hit; if(needed.length&&hit===needed.length) completed++;
   });
-  return {days:completed,readings:readings,totalDays:days.length,totalReadings:days.length*req.length};
+  return {days:completed,readings:readings,totalDays:totalDays,totalReadings:mcheyneDays().length*4};
 }
 function checkPlanReminder(now){
   var prefs=notificationPrefs(); if(prefs.pushConnected) return;
   var s=planSettings(); if(!s.reminderEnabled) return;
   now=now||new Date(); var key=dateKeyLocal(now); if(s.lastReminderKey===key) return;
   if(now.getHours()*60+now.getMinutes()<timeMinutes(s.reminderTime)) return;
-  var info=planDayForDate(key); if(!info.day) return;
-  var req=planIndexesForMode(s.mode), done=planDone()[key]||[];
-  if(req.every(function(i){return done.indexOf(i)>-1;})){ s.lastReminderKey=key; savePlanSettings(s); return; }
+  var info=planBundleForDate(key); if(!info.items.length) return;
+  var done=planDone()[key]||[], needed=info.items.map(function(i){return i.slot;});
+  if(needed.every(function(i){return done.indexOf(i)>-1;})){ s.lastReminderKey=key; savePlanSettings(s); return; }
   s.lastReminderKey=key; savePlanSettings(s);
   showAppNotification("Reading plan reminder","Today’s M’Cheyne readings are ready.",{tag:"mcheyne-"+key,url:"./?tab=devotion&plan=1",type:"plan"}).then(function(shown){ if(!shown) toast("Reading plan reminder · Today’s readings are ready"); });
 }
@@ -391,7 +404,7 @@ function normalizeNoteLibrary(lib){
   if(!lib.docs) lib.docs={};
   ["sermon","study","men"].forEach(function(k){
     if(!Array.isArray(lib.docs[k])) lib.docs[k]=[];
-    lib.docs[k].forEach(function(n){ if(n.reminder) n.reminder=cleanReminder(n.reminder); });
+    lib.docs[k].forEach(function(n){ if(n.reminder) n.reminder=cleanReminder(n.reminder); if(!n.format) n.format=(n.body&&/<[a-z][\s\S]*>/i.test(n.body))?"html":"markdown"; });
   });
   if(!Array.isArray(lib.prayers)) lib.prayers=[];
   lib.prayers.forEach(function(r){
@@ -419,13 +432,13 @@ function saveNoteLibrary(lib){ jset("noteLibrary",normalizeNoteLibrary(lib)); }
 function docsFor(section){ var lib=noteLibrary(); return (lib.docs[section]||[]).slice().sort(function(a,b){return (b.updated||0)-(a.updated||0);}); }
 function findDoc(section,id){ return docsFor(section).find(function(n){return n.id===id;}) || null; }
 function createDoc(section){
-  var lib=noteLibrary(), now=Date.now(), doc={id:makeId("note"),title:"",body:"",created:now,updated:now};
+  var lib=noteLibrary(), now=Date.now(), doc={id:makeId("note"),title:"",body:"",format:"html",created:now,updated:now};
   lib.docs[section].unshift(doc); saveNoteLibrary(lib); return doc;
 }
-function saveDoc(section,id,title,body){
+function saveDoc(section,id,title,body,format){
   var lib=noteLibrary(), list=lib.docs[section]||[], doc=list.find(function(n){return n.id===id;});
   if(!doc) return null;
-  doc.title=String(title||"").trim(); doc.body=String(body||""); doc.updated=Date.now();
+  doc.title=String(title||"").trim(); doc.body=String(body||""); doc.format=format||doc.format||"html"; doc.updated=Date.now();
   saveNoteLibrary(lib); return doc;
 }
 function deleteDoc(section,id){
@@ -550,7 +563,7 @@ function fireReminderTarget(target,item,key){
   if(target.type==="prayer"){
     title="Prayer reminder";
     body=(item.category?item.category+": ":"")+snip(item.text||"Prayer request",120);
-    url="./?tab=notes&section=prayer";
+    url="./?tab=notes&section=prayer&prayer="+encodeURIComponent(target.id);
   }else{
     title="Note reminder";
     body=(item.title||"Untitled note")+" · "+noteSectionById(target.section).label;
@@ -626,56 +639,56 @@ function saveReminderFromPanel(){
 }
 function noteStats(){
   var lib=noteLibrary(), docs=0, chars=0;
-  ["sermon","study","men"].forEach(function(k){ docs+=(lib.docs[k]||[]).length; (lib.docs[k]||[]).forEach(function(n){chars+=(n.title||"").length+(n.body||"").length;}); });
+  ["sermon","study","men"].forEach(function(k){ docs+=(lib.docs[k]||[]).length; (lib.docs[k]||[]).forEach(function(n){chars+=(n.title||"").length+(n.format==="html"?richPlainText(n.body||"").length:(n.body||"").length);}); });
   lib.prayers.forEach(function(r){chars+=(r.text||"").length;});
   return {docs:docs,prayers:lib.prayers.length,chars:chars};
 }
-function notePreviewText(body){ return snip(String(body||"").replace(/[#*_>`\[\]-]/g," ").replace(/\s+/g," ").trim(),150); }
-function renderMarkdown(src){
+function legacyMarkdownToHTML(src){
   var md=esc(String(src||"").replace(/\r/g,""));
-  if(!md.trim()) return '<p class="md-empty">Nothing here yet. Start writing in the editor.</p>';
+  if(!md.trim()) return "";
   md=md.replace(/^### (.*)$/gm,'<h3>$1</h3>')
        .replace(/^## (.*)$/gm,'<h2>$1</h2>')
        .replace(/^# (.*)$/gm,'<h1>$1</h1>')
        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
        .replace(/\*(.+?)\*/g,'<em>$1</em>')
        .replace(/`([^`]+)`/g,'<code>$1</code>');
-  var lines=md.split('\n'), out=[], inUl=false, inOl=false;
-  function closeLists(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}}
-  lines.forEach(function(line){
-    if(/^\s*$/.test(line)){closeLists();return;}
-    var m;
-    if((m=line.match(/^\- \[ \] (.*)$/))){if(inOl){out.push('</ol>');inOl=false;}if(!inUl){out.push('<ul class="md-check">');inUl=true;}out.push('<li><span class="box"></span><span>'+m[1]+'</span></li>');return;}
-    if((m=line.match(/^\- \[x\] (.*)$/i))){if(inOl){out.push('</ol>');inOl=false;}if(!inUl){out.push('<ul class="md-check">');inUl=true;}out.push('<li><span class="box checked">✓</span><span>'+m[1]+'</span></li>');return;}
-    if((m=line.match(/^\- (.*)$/))){if(inOl){out.push('</ol>');inOl=false;}if(!inUl){out.push('<ul>');inUl=true;}out.push('<li>'+m[1]+'</li>');return;}
-    if((m=line.match(/^\d+\. (.*)$/))){if(inUl){out.push('</ul>');inUl=false;}if(!inOl){out.push('<ol>');inOl=true;}out.push('<li>'+m[1]+'</li>');return;}
-    closeLists();
-    if((m=line.match(/^&gt;\s?(.*)$/))){out.push('<blockquote>'+m[1]+'</blockquote>');return;}
-    out.push('<p>'+line+'</p>');
-  });
-  closeLists(); return out.join('');
+  return md.split('\n').map(function(line){ return line.trim()?'<div>'+line+'</div>':'<div><br></div>'; }).join('');
 }
-function noteButtonLabel(){ return state.notePreview ? "EDIT" : "PREVIEW"; }
+function docRichHTML(doc){
+  if(!doc) return "";
+  return doc.format==="html"?String(doc.body||""):legacyMarkdownToHTML(doc.body||"");
+}
+function richPlainText(html){
+  var raw=String(html||"");
+  try{ var el=document.createElement("div"); el.innerHTML=raw; return (el.textContent||el.innerText||"").replace(/\s+/g," ").trim(); }
+  catch(e){ return raw.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim(); }
+}
+function notePreviewText(body,format){
+  var plain=format==="html"?richPlainText(body):String(body||"").replace(/[#*_>`\[\]-]/g," ").replace(/\s+/g," ").trim();
+  return snip(plain,150);
+}
 function saveOpenNote(){
   if(!state.noteId || state.noteSection==="prayer") return;
   var current=findDoc(state.noteSection,state.noteId); if(!current) return;
   var title=$("noteTitle"), body=$("notesEditor");
-  saveDoc(state.noteSection,state.noteId,title?title.value:current.title,body?body.value:current.body);
+  saveDoc(state.noteSection,state.noteId,title?title.value:current.title,body?body.innerHTML:docRichHTML(current),"html");
 }
-function applyMarkdownAction(action){
-  var ta=$("notesEditor"); if(!ta) return;
-  var start=ta.selectionStart||0,end=ta.selectionEnd||0,val=ta.value||"",sel=val.slice(start,end),rep="";
-  switch(action){
-    case "bold":rep="**"+(sel||"bold text")+"**";break;
-    case "italic":rep="*"+(sel||"italic text")+"*";break;
-    case "h2":rep="## "+(sel||"Section title");break;
-    case "bullet":rep="- "+(sel||"List item");break;
-    case "check":rep="- [ ] "+(sel||"Checklist item");break;
-    case "quote":rep="> "+(sel||"Quoted note");break;
-    case "verse":rep="**Scripture:** "+(sel||"Book 1:1");break;
-    default:return;
-  }
-  ta.setRangeText(rep,start,end,"end"); saveOpenNote(); ta.focus();
+function applyRichTextAction(action){
+  var editor=$("notesEditor"); if(!editor) return;
+  editor.focus();
+  try{
+    if(action==="bold") document.execCommand("bold",false,null);
+    else if(action==="italic") document.execCommand("italic",false,null);
+    else if(action==="underline") document.execCommand("underline",false,null);
+    else if(action==="h2") document.execCommand("formatBlock",false,"h2");
+    else if(action==="bullet") document.execCommand("insertUnorderedList",false,null);
+    else if(action==="number") document.execCommand("insertOrderedList",false,null);
+    else if(action==="quote") document.execCommand("formatBlock",false,"blockquote");
+    else if(action==="check") document.execCommand("insertHTML",false,"<div>☐&nbsp;</div>");
+    else if(action==="undo") document.execCommand("undo",false,null);
+    else if(action==="redo") document.execCommand("redo",false,null);
+  }catch(e){}
+  saveOpenNote();
 }
 
 /* ---------- verse bookmarks + categories ---------- */
@@ -1130,7 +1143,7 @@ function podcastView(){
   var prefs=notificationPrefs(), latest=state.latestEpisode;
   if(pushServiceUrl() && (!latest || Date.now()-(state.latestEpisodeFetched||0)>300000)) setTimeout(function(){ loadLatestEpisode(false).catch(function(){}); },0);
   var latestHTML=latest?'<a class="latest-episode-card" href="'+esc(latest.url||SHOW_URL)+'" target="_blank" rel="noopener" data-podact="episode"><span class="content-kicker">LATEST EPISODE</span><b>'+esc(latest.name||'Latest episode')+'</b><small>'+esc(latest.release_date||'')+(latest.duration_ms?' · '+Math.round(latest.duration_ms/60000)+' MIN':'')+'</small><span class="latest-open">LISTEN ›</span></a>':'';
-  var pushLabel=prefs.pushConnected?'TRUE PUSH ON':(pushServiceUrl()?'CONNECT PUSH':'SET UP PUSH');
+  var pushLabel=prefs.pushConnected?'ON':'TURN ON';
   return '<div class="pad podcast-page">'+
     screenHead("Podcast","Listen to the latest weekly devotional")+
     '<div class="podcast-showcase">'+
@@ -1143,8 +1156,8 @@ function podcastView(){
     '</div>'+latestHTML+
     '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
     '<a class="cta spotify-link" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
-    '<div class="podcast-alert-card"><div><span class="content-kicker">NEW EPISODE PUSH</span><b>Detected from Spotify</b><small>'+esc(pushConnectionLabel())+'</small></div><button class="'+(prefs.pushConnected?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+pushLabel+'</button></div>'+
-    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div><p class="muted">When the push service is connected, the backend checks Spotify for a changed episode ID and sends a notification even when the app is closed.</p></div>'+
+    '<div class="podcast-alert-card"><div><span class="content-kicker">NEW EPISODE PUSH</span><b>New episode alerts</b><small>'+esc(pushConnectionLabel())+'</small></div><button class="'+(prefs.pushConnected?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+pushLabel+'</button></div>'+
+    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div><p class="muted">The app watches the podcast RSS feed for a new episode and can send a push notification even when the installed app is closed.</p></div>'+
     '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
@@ -1158,9 +1171,9 @@ function togglePlanReading(dateStr, idx){
   jset("plandone",d);
 }
 function savePlanSetupFromUI(){
-  var s=planSettings(), start=$("planStartDate"), mode=$("planMode"), enabled=$("planReminderEnabled"), time=$("planReminderTime");
-  if(start&&start.value) s.startDate=start.value;
-  if(mode) s.mode=mode.value;
+  var s=planSettings(), startEl=$("planStartDate"), duration=$("planDuration"), enabled=$("planReminderEnabled"), time=$("planReminderTime");
+  if(startEl&&startEl.value) s.startDate=startEl.value;
+  if(duration&&["year","sixmonth"].indexOf(duration.value)>-1) s.duration=duration.value;
   if(enabled) s.reminderEnabled=!!enabled.checked;
   if(time&&time.value) s.reminderTime=time.value;
   s.lastReminderKey=""; savePlanSettings(s);
@@ -1168,31 +1181,28 @@ function savePlanSetupFromUI(){
   syncPushPreferences();
 }
 function plansView(){
-  var setup=planSettings(), info=planDayForDate(state.planDate), doneList=planDone()[state.planDate]||[], req=planIndexesForMode(setup.mode), stats=planProgressStats();
+  var setup=planSettings(), info=planBundleForDate(state.planDate), doneList=planDone()[state.planDate]||[], stats=planProgressStats();
   var body;
-  if(!info.day){
-    body='<div class="empty"><h4>'+(info.index<0?'PLAN HAS NOT STARTED':'PLAN COMPLETE')+'</h4><p>'+(info.index<0?'Your selected start date is '+esc(setup.startDate)+'. Choose a date on or after your start date.':'You have reached the end of the 365-day M’Cheyne calendar. Reset or choose a new start date when you are ready to begin again.')+'</p></div>';
+  if(!info.items.length){
+    body='<div class="empty"><h4>'+(info.index<0?'PLAN HAS NOT STARTED':'PLAN COMPLETE')+'</h4><p>'+(info.index<0?'Your selected start date is '+esc(setup.startDate)+'. Use Today or browse to a date on or after your start date.':'You have reached the end of your '+esc(planDurationLabel(setup.duration))+'. Reset or choose a new start date when you are ready to begin again.')+'</p></div>';
   } else {
-    var readings=info.day.readings;
-    var mk=function(title, idxs){
-      if(!idxs.length) return '';
-      return '<div class="stream content-card"><h4>'+title+'</h4>'+idxs.map(function(i){
-        var on=doneList.indexOf(i)>-1;
-        return '<div class="rd'+(on?' done':'')+'" data-plan="'+i+'"><div class="tick">&#10003;</div><div class="rt">'+esc(readings[i])+'</div><button class="mini" data-planopen="'+esc(readings[i])+'">READ</button></div>';
-      }).join('')+'</div>';
-    };
-    var chunks=setup.mode==='family'?mk('FAMILY · READ ALOUD',[0,1]):setup.mode==='personal'?mk('SECRET · ON YOUR OWN',[2,3]):mk('FAMILY · READ ALOUD',[0,1])+mk('SECRET · ON YOUR OWN',[2,3]);
-    var completed=req.filter(function(i){return doneList.indexOf(i)>-1;}).length;
-    body=chunks+'<div class="motto">'+esc(MCHEYNE_MOTTOS[info.day.month])+'</div><div class="plan-day-progress">DAY '+(info.index+1)+' OF '+info.total+' · '+completed+' OF '+req.length+' READINGS DONE</div>';
+    var rows=info.items.map(function(item){
+      var on=doneList.indexOf(item.slot)>-1;
+      return '<div class="rd'+(on?' done':'')+'" data-plan="'+item.slot+'"><div class="tick">&#10003;</div><div class="rt">'+esc(item.ref)+'</div><button class="mini" data-planopen="'+esc(item.ref)+'">READ</button></div>';
+    }).join('');
+    var completed=info.items.filter(function(item){return doneList.indexOf(item.slot)>-1;}).length;
+    body='<div class="stream content-card"><h4>TODAY’S READINGS</h4>'+rows+'</div>'+ 
+      '<div class="motto">'+esc(MCHEYNE_MOTTOS[info.items[0].month]||'')+'</div>'+ 
+      '<div class="plan-day-progress">DAY '+(info.index+1)+' OF '+info.total+' · '+completed+' OF '+info.items.length+' READINGS DONE</div>';
   }
   return '<div class="pad reading-plan-page">'+
-    screenHead("Reading Plan","M’Cheyne · "+planModeLabel(setup.mode))+
+    screenHead("Reading Plan","M’Cheyne · "+planDurationLabel(setup.duration))+
     '<div class="tabsel devotion-tabs devotion-switch"><button data-dev="today">TODAY</button><button class="on" data-dev="plan">READING PLAN</button></div>'+
     '<div class="content-card plan-setup-card"><div class="plan-setup-head"><div><div class="content-kicker">YOUR PLAN</div><b>'+stats.days+' DAYS COMPLETED</b><small>'+stats.readings+' OF '+stats.totalReadings+' READINGS</small></div><button class="mini" data-plantoday="1">TODAY</button></div>'+
-      '<div class="plan-setup-grid"><label>START DATE<input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label>TRACK<select id="planMode"><option value="complete"'+(setup.mode==='complete'?' selected':'')+'>Complete · 4/day</option><option value="family"'+(setup.mode==='family'?' selected':'')+'>Family · 2/day</option><option value="personal"'+(setup.mode==='personal'?' selected':'')+'>Personal · 2/day</option></select></label></div>'+
-      '<div class="plan-reminder-row"><label class="toggle-row"><input type="checkbox" id="planReminderEnabled"'+(setup.reminderEnabled?' checked':'')+'><span></span><b>Reading reminder</b></label><input type="time" id="planReminderTime" value="'+esc(setup.reminderTime)+'"></div>'+
-      '<p>Changing the start date shifts Day 1 of the classic M’Cheyne calendar to your chosen date. Your saved progress remains in the backup and can be reset from Settings.</p></div>'+
-    '<div class="planbar"><label>VIEW DATE</label><input type="date" id="planDate" value="'+state.planDate+'"></div>'+body+
+      '<div class="plan-setup-grid"><label>START DATE<input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label>PLAN<select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year · 4 readings/day</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Month · 8 readings/day</option></select></label></div>'+
+      '<div class="plan-reminder-row"><label class="toggle-row"><input type="checkbox" id="planReminderEnabled"'+(setup.reminderEnabled?' checked':'')+'><span></span><b>Reading reminder</b></label><label class="plan-reminder-time-label">TIME<input type="time" id="planReminderTime" value="'+esc(setup.reminderTime)+'"></label></div>'+
+      '<p>The 1 Year plan follows one M’Cheyne calendar day each day. The 6 Month plan combines two consecutive M’Cheyne days so the same reading schedule is completed in about half the time.</p></div>'+
+    '<div class="plan-date-nav"><button class="mini" data-plandate="-1" aria-label="Previous reading day">‹</button><label><span>READING DATE</span><input type="date" id="planDate" value="'+state.planDate+'"></label><button class="mini" data-plandate="1" aria-label="Next reading day">›</button></div>'+body+
     '<div class="foot">PUBLIC DOMAIN · ST. PETER’S, DUNDEE, 1842</div></div>';
 }
 
@@ -1470,14 +1480,15 @@ function noteListView(sec){
   var docs=docsFor(sec.id);
   var rows=docs.length?docs.map(function(n){
     var title=(n.title||'').trim()||'Untitled note';
-    var preview=notePreviewText(n.body)||'No note text yet.';
+    var preview=notePreviewText(n.body,n.format)||'No note text yet.';
     var d=new Date(n.updated||n.created||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    var chars=(n.format==='html'?richPlainText(n.body):String(n.body||'')).length;
     return '<button class="note-list-card" data-noteopen="'+n.id+'">'+
       '<span class="note-list-top"><b>'+esc(title)+'</b><small>'+esc(d)+'</small></span>'+
       '<span class="note-list-preview">'+esc(preview)+'</span>'+
-      '<span class="note-list-meta">'+(n.body||'').length.toLocaleString()+' CHARACTERS'+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button>';
+      '<span class="note-list-meta">'+chars.toLocaleString()+' CHARACTERS'+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button>';
   }).join(''):emptyBox('NO NOTES YET','Create a note and it will appear here with its title and a preview.');
-  return '<div class="pad notes-page">'+screenHead('Notes','Saved, titled notes with Markdown support')+
+  return '<div class="pad notes-page">'+screenHead('Notes','Saved, titled notes with rich text editing')+
     notesTabsHTML()+
     '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>'+sec.hint+'</p></div><button class="primary-mini" data-notenew="'+sec.id+'">+ NEW NOTE</button></div>'+
     '<div class="note-list">'+rows+'</div>'+
@@ -1490,41 +1501,43 @@ function noteEditorView(sec,doc){
     '<div class="nested-topbar"><button class="backlink compact-back" data-noteback="1">‹ NOTES</button><span>LAST SAVED '+esc(updated.toUpperCase())+'</span></div>'+
     '<input id="noteTitle" class="note-title-input" type="text" placeholder="Note title" value="'+esc(doc.title||'')+'" autocomplete="off">'+
     '<button class="reminder-strip" data-reminderdoc="'+doc.id+'"><span>🔔</span><span><b>Reminder</b><small>'+esc(doc.reminder?reminderSummary(doc.reminder):'Not set')+'</small></span><span>›</span></button>'+
-    '<div class="notes-toolbar compact-toolbar" role="toolbar" aria-label="Markdown formatting">'+
-      '<button type="button" data-md="bold" aria-label="Bold" title="Bold"><b>B</b></button>'+
-      '<button type="button" data-md="italic" aria-label="Italic" title="Italic"><i>I</i></button>'+
-      '<button type="button" data-md="h2" aria-label="Heading" title="Heading">H</button>'+
-      '<button type="button" data-md="bullet" aria-label="Bullet list" title="Bullet list">•</button>'+
-      '<button type="button" data-md="check" aria-label="Checklist" title="Checklist">☑</button>'+
-      '<button type="button" data-md="quote" aria-label="Quote" title="Quote">❝</button>'+
-      '<button type="button" data-md="verse" aria-label="Scripture reference" title="Scripture">§</button>'+
+    '<div class="notes-toolbar compact-toolbar rich-toolbar" role="toolbar" aria-label="Text formatting">'+
+      '<button type="button" data-rich="bold" aria-label="Bold" title="Bold"><b>B</b></button>'+
+      '<button type="button" data-rich="italic" aria-label="Italic" title="Italic"><i>I</i></button>'+
+      '<button type="button" data-rich="underline" aria-label="Underline" title="Underline"><u>U</u></button>'+
+      '<button type="button" data-rich="h2" aria-label="Heading" title="Heading">H</button>'+
+      '<button type="button" data-rich="bullet" aria-label="Bullet list" title="Bullet list">•</button>'+
+      '<button type="button" data-rich="number" aria-label="Numbered list" title="Numbered list">1.</button>'+
+      '<button type="button" data-rich="check" aria-label="Checklist" title="Checklist">☑</button>'+
+      '<button type="button" data-rich="quote" aria-label="Quote" title="Quote">❝</button>'+
+      '<button type="button" data-rich="undo" aria-label="Undo" title="Undo">↶</button>'+
+      '<button type="button" data-rich="redo" aria-label="Redo" title="Redo">↷</button>'+
     '</div>'+
-    (state.notePreview?'<div class="notes-preview markdown-body">'+renderMarkdown(doc.body||'')+'</div>':'<textarea id="notesEditor" class="notes-editor" placeholder="Write your note in Markdown…">'+esc(doc.body||'')+'</textarea>')+
-    '<div class="note-editor-actions"><button class="secondary-btn" data-notepreview="1">'+noteButtonLabel()+'</button><button class="secondary-btn danger" data-notedelete="'+doc.id+'">DELETE</button><button class="primary-btn" data-notesave="1">SAVE NOTE</button></div>'+
-    '<div class="notes-meta">MARKDOWN SUPPORTED · AUTOSAVED ON THIS DEVICE</div></div>';
+    '<div id="notesEditor" class="notes-editor rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Write your note…">'+docRichHTML(doc)+'</div>'+
+    '<div class="note-editor-actions"><button class="secondary-btn danger" data-notedelete="'+doc.id+'">DELETE</button><button class="primary-btn" data-notesave="1">SAVE NOTE</button></div>'+
+    '<div class="notes-meta">RICH TEXT · AUTOSAVED ON THIS DEVICE</div></div>';
 }
+
 function prayerTodayFeed(){
   var today=prayersForToday();
   if(!today.length) return '<div class="today-prayer-card empty-today"><div class="content-kicker">TODAY’S PRAYER</div><p>No scheduled or pinned prayer requests for today.</p></div>';
   return '<div class="today-prayer-card"><div class="content-kicker">TODAY’S PRAYER</div><div class="today-prayer-list">'+today.map(function(r){
-    return '<div class="today-prayer-row"><span class="prayer-cat-chip">'+esc(r.category||'Personal')+'</span><div><b>'+esc(snip(r.text||'Prayer request',105))+'</b><small>'+(r.pinned?'PINNED · ':'')+(r.reminder?esc(reminderSummary(r.reminder)):'ONGOING')+'</small></div></div>';
+    return '<button class="today-prayer-row" data-prayeropen="'+r.id+'"><span class="prayer-cat-chip">'+esc(r.category||'Personal')+'</span><div><b>'+esc(snip(r.text||'Prayer request',105))+'</b><small>'+(r.pinned?'PINNED · ':'')+(r.reminder?esc(reminderSummary(r.reminder)):'ONGOING')+'</small></div></button>';
   }).join('')+'</div></div>';
 }
 function prayerNotesView(sec){
   var prayers=prayerRequests();
   var rows=prayers.length?prayers.map(function(r){
     var d=new Date(r.updated||r.created||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    return '<div class="prayer-card'+(r.answered?' answered':'')+(r.pinned?' pinned':'')+'">'+
-      '<div class="prayer-card-head"><span>'+(r.pinned?'📌 PINNED · ':'')+esc(d)+'</span><div>'+ 
-        '<button class="icon-only-btn" data-prayerpin="'+r.id+'" aria-label="'+(r.pinned?'Unpin':'Pin')+' prayer request" title="'+(r.pinned?'Unpin':'Pin')+'">'+(r.pinned?'★':'☆')+'</button>'+ 
-        '<button class="icon-only-btn" data-reminderprayer="'+r.id+'" aria-label="Set reminder" title="Reminder">🔔</button>'+ 
-        '<button class="icon-text-btn" data-prayertoggle="'+r.id+'">'+(r.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button>'+ 
-        '<button class="icon-only-btn danger" data-prayerdelete="'+r.id+'" aria-label="Delete prayer request">×</button></div></div>'+ 
-      '<div class="prayer-meta-row"><label>CATEGORY<select data-prayercategory="'+r.id+'">'+PRAYER_CATEGORIES.map(function(c){return '<option value="'+esc(c)+'"'+(r.category===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></label>'+ 
-        '<span class="prayer-reminder-chip">'+(r.reminder?'🔔 '+esc(reminderSummary(r.reminder)):'NO REMINDER')+'</span></div>'+ 
-      '<textarea class="prayer-text" data-prayertext="'+r.id+'" placeholder="What do you want to pray for?">'+esc(r.text||'')+'</textarea>'+ 
-      (r.answered?'<div class="prayer-status">✓ ANSWERED</div>':'')+'</div>';
-  }).join(''):emptyBox('NO PRAYER REQUESTS YET','Add a request. Each request can be as long as you need, categorized, pinned, and given a recurring reminder.');
+    return '<div class="prayer-summary-card'+(r.answered?' answered':'')+(r.pinned?' pinned':'')+'">'+
+      '<button class="prayer-summary-open" data-prayeropen="'+r.id+'">'+
+        '<span class="prayer-summary-top"><span class="prayer-cat-chip">'+esc(r.category||'Personal')+'</span><small>'+(r.pinned?'📌 PINNED · ':'')+esc(d)+'</small></span>'+
+        '<span class="prayer-summary-preview">'+esc(snip(r.text||'Prayer request',180))+'</span>'+
+        '<span class="prayer-summary-meta">'+(r.reminder?'🔔 '+esc(reminderSummary(r.reminder)):'NO REMINDER')+(r.answered?' · ANSWERED':'')+'</span>'+
+      '</button>'+
+      '<div class="prayer-summary-actions"><button class="secondary-btn compact" data-prayertoggle="'+r.id+'">'+(r.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button><button class="icon-only-btn" data-reminderprayer="'+r.id+'" aria-label="Set prayer reminder">🔔</button></div>'+
+    '</div>';
+  }).join(''):emptyBox('NO PRAYER REQUESTS YET','Add a request. Each request becomes its own card with a category, preview, reminder, and answered status.');
   var composer=state.prayerComposer?'<div class="prayer-composer"><div class="content-kicker">NEW PRAYER REQUEST</div><textarea id="prayerDraft" placeholder="What do you want to pray for?">'+esc(state.prayerDraft||'')+'</textarea><div class="prayer-composer-row"><select id="prayerDraftCategory">'+PRAYER_CATEGORIES.map(function(c){return '<option value="'+esc(c)+'"'+(state.prayerDraftCategory===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select><button class="secondary-btn" data-prayercancel="1">CANCEL</button><button class="primary-btn" data-prayersave="1">SAVE REQUEST</button></div></div>':'';
   return '<div class="pad notes-page prayer-page">'+screenHead('Prayer Requests','What do you want to pray for?')+
     notesTabsHTML()+
@@ -1533,6 +1546,20 @@ function prayerNotesView(sec){
     '<div class="prayer-list">'+rows+'</div>'+ 
     '<div class="foot">NO CHARACTER LIMIT · REMINDERS · CATEGORIES · INCLUDED IN BACKUPS</div></div>';
 }
+function prayerEditorView(sec,prayer){
+  if(!prayer){state.prayerId=null;return prayerNotesView(sec);}
+  var updated=new Date(prayer.updated||prayer.created||Date.now()).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  return '<div class="pad notes-page prayer-editor-page">'+
+    '<div class="nested-topbar"><button class="backlink compact-back" data-prayerback="1">‹ PRAYERS</button><span>LAST SAVED '+esc(updated.toUpperCase())+'</span></div>'+
+    '<div class="prayer-editor-status"><span class="prayer-cat-chip">'+esc(prayer.category||'Personal')+'</span>'+(prayer.pinned?'<span class="prayer-pin-chip">📌 PINNED</span>':'')+(prayer.answered?'<span class="prayer-answered-chip">✓ ANSWERED</span>':'')+'</div>'+
+    '<label class="field-label">CATEGORY<select id="prayerEditCategory">'+PRAYER_CATEGORIES.map(function(c){return '<option value="'+esc(c)+'"'+(prayer.category===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></label>'+
+    '<textarea id="prayerEditText" class="prayer-editor-text" placeholder="What do you want to pray for?">'+esc(prayer.text||'')+'</textarea>'+
+    '<button class="reminder-strip" data-reminderprayer="'+prayer.id+'"><span>🔔</span><span><b>Reminder</b><small>'+esc(prayer.reminder?reminderSummary(prayer.reminder):'Not set')+'</small></span><span>›</span></button>'+
+    '<div class="prayer-editor-toggles"><button class="secondary-btn" data-prayerpin="'+prayer.id+'">'+(prayer.pinned?'UNPIN REQUEST':'PIN TO TOP')+'</button><button class="secondary-btn" data-prayertoggle="'+prayer.id+'">'+(prayer.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button></div>'+
+    '<div class="note-editor-actions prayer-editor-actions"><button class="secondary-btn danger" data-prayerdelete="'+prayer.id+'">DELETE</button><button class="primary-btn" data-prayersaveedit="'+prayer.id+'">SAVE REQUEST</button></div>'+
+    '<div class="notes-meta">NO CHARACTER LIMIT · SAVED ON THIS DEVICE</div></div>';
+}
+
 function reminderOverlayView(){
   var target=state.reminderTarget; if(!target) return '';
   var r=reminderForTarget(target)||defaultReminder();
@@ -1558,7 +1585,7 @@ function reminderOverlayView(){
 }
 function notesView(){
   var sec=noteSectionById(state.noteSection), html;
-  if(sec.kind==='prayer') html=prayerNotesView(sec);
+  if(sec.kind==='prayer') html=state.prayerId?prayerEditorView(sec,findPrayer(state.prayerId)):prayerNotesView(sec);
   else if(state.noteId) html=noteEditorView(sec,findDoc(sec.id,state.noteId));
   else html=noteListView(sec);
   return html+reminderOverlayView();
@@ -1716,7 +1743,7 @@ function drawCard(){
   roundedRect(inner,inner,W-inner*2,H-inner*2,W*.016); x.strokeStyle="rgba(197,159,91,.72)"; x.lineWidth=Math.max(1.6,W*.0018); x.stroke();
 
   // The logo is anchored from the top using W, so changing aspect ratio never moves or stretches it.
-  var logoW=W*.205, logoH=logoW, logoY=outer+W*.17;
+  var logoW=W*.23, logoH=logoW, logoY=outer+W*.19;
   x.textAlign="center"; x.textBaseline="middle";
   if(cardLogo.complete && cardLogo.naturalWidth){
     x.save(); x.beginPath(); x.arc(W/2,logoY,logoW*.53,0,Math.PI*2); x.closePath();
@@ -1728,7 +1755,7 @@ function drawCard(){
   var safeX=W*.178, maxW=W-safeX*2;
   var verseText=String(cv.text||"").toUpperCase();
   var verseTop=logoY+logoH/2+W*.082;
-  var refY=H-W*.195, footerY=H-W*.084;
+  var refY=H-W*.235, authorY=H-W*.165, footerY=H-W*.112;
   var verseBottom=refY-W*.115;
   var avail=Math.max(W*.25,verseBottom-verseTop);
   var size=Math.round(W*.057), minSize=Math.round(W*.029), lines=wrappedLines(verseText,maxW,size);
@@ -1740,8 +1767,10 @@ function drawCard(){
 
   x.strokeStyle="rgba(182,136,64,.72)"; x.lineWidth=Math.max(2,W*.0021);
   x.beginPath(); x.moveTo(W*.34,refY-W*.042); x.lineTo(W*.66,refY-W*.042); x.stroke();
-  x.fillStyle="#624416"; x.font="800 "+Math.round(W*.024)+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; x.fillText(cv.ref.toUpperCase(),W/2,refY);
-  x.fillStyle="rgba(123,90,36,.9)"; x.font="italic "+Math.round(W*.0215)+"px 'Lora', Georgia, serif";
+  x.fillStyle="#624416"; x.font="800 "+Math.round(W*.027)+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; x.fillText((cv.ref+" · "+(cv.abbr||"BSB")).toUpperCase(),W/2,refY);
+  x.fillStyle="rgba(96,67,31,.94)"; x.font="800 "+Math.round(W*.0225)+"px 'Cinzel', 'Roboto Slab', Georgia, serif";
+  x.fillText("JUSTIN MCFADDEN",W/2,authorY);
+  x.fillStyle="rgba(123,90,36,.9)"; x.font="italic "+Math.round(W*.0245)+"px 'Lora', Georgia, serif";
   x.fillText("Sharpening the man through the Message.",W/2,footerY);
 }
 
@@ -1814,10 +1843,10 @@ function settingsView(){
     '<div class="settings-legal">ASV and YLT are public domain. The KJV is public domain in the United States; special Crown rights can apply to publication in the United Kingdom.</div>'+
     '<div class="grouphd settings-section-head">NOTIFICATIONS</div>'+
     '<div class="setrow"><div><div class="lbl">App notifications</div><div class="sub">'+(notificationStatus()==="granted"?"Enabled":notificationStatus()==="denied"?"Blocked in browser settings":notificationStatus()==="unsupported"?"Not supported on this browser":"Permission not granted")+'</div></div><button class="mini" data-notifyenable="1">ENABLE</button></div>'+
-    '<div class="setrow push-service-row"><div><div class="lbl">Podcast push service</div><div class="sub">'+esc(pushConnectionLabel())+'</div><input id="pushServiceUrl" class="settings-inline-input" type="url" placeholder="https://your-worker.workers.dev" value="'+esc(pushServiceUrl())+'"></div><div class="settings-stack-actions"><button class="mini" data-pushurlsave="1">SAVE URL</button><button class="mini" data-podcastnotify="1">'+(nprefs.pushConnected?"DISCONNECT":"CONNECT")+'</button></div></div>'+
-    '<div class="settings-legal">The included Cloudflare Worker checks Spotify on a schedule. Once connected, a changed episode ID triggers true Web Push even while the installed app is closed.</div>'+
+    '<div class="setrow"><div><div class="lbl">New podcast episodes</div><div class="sub">'+esc(pushConnectionLabel())+'</div></div><button class="mini" data-podcastnotify="1">'+(nprefs.pushConnected?"TURN OFF":"TURN ON")+'</button></div>'+
+    '<div class="settings-legal">Episode detection uses The Applied Word podcast RSS feed in the background. End users only need to turn alerts on; no Spotify login or feed setup is required.</div>'+
     '<div class="grouphd settings-section-head">READING PLAN</div>'+
-    '<div class="setrow"><div><div class="lbl">M’Cheyne progress</div><div class="sub">'+planProgressStats().days+' days completed · starts '+esc(planSettings().startDate)+' · '+esc(planModeLabel(planSettings().mode))+'</div></div><button class="mini danger" data-planreset="1">RESET PLAN</button></div>'+
+    '<div class="setrow"><div><div class="lbl">M’Cheyne progress</div><div class="sub">'+planProgressStats().days+' days completed · starts '+esc(planSettings().startDate)+' · '+esc(planDurationLabel(planSettings().duration))+'</div></div><button class="mini danger" data-planreset="1">RESET PLAN</button></div>'+
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
     '<div class="setrow"><div><div class="lbl">Highlights &amp; saved Scripture</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' chapter bookmarks · '+vbCount+' verse bookmarks · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Notes library</div><div class="sub">'+nstats.docs+' saved notes · '+nstats.prayers+' prayer requests · '+nstats.chars.toLocaleString()+' characters</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
@@ -1873,12 +1902,13 @@ function backAvailable(){
   if(state.tab==="settings" || state.tab==="card") return true;
   if(state.tab==="devotion" && state.devMode==="plan") return true;
   if(state.tab==="bible" && (state.bview!=="read" || state.categoryOpen)) return true;
-  if(state.tab==="notes" && (state.noteId || state.prayerComposer)) return true;
+  if(state.tab==="notes" && (state.noteId || state.prayerId || state.prayerComposer)) return true;
   return false;
 }
 function appBack(){
   if(state.reminderTarget){ state.reminderTarget=null; render(); return; }
   if(state.tab==="notes" && state.prayerComposer){ state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); return; }
+  if(state.tab==="notes" && state.prayerId){ state.prayerId=null; render(); return; }
   if(state.tab==="notes" && state.noteId){ saveOpenNote(); state.noteId=null; state.notePreview=false; render(); return; }
   if(state.tab==="bible" && state.categoryOpen){ state.categoryOpen=null; state.bview="categories"; render(); return; }
   if(state.tab==="bible" && state.bview!=="read"){ state.bview="read"; state.sel=null; render(); return; }
@@ -1958,9 +1988,10 @@ function wire(scr){
 
   var pd=$("planDate");
   if(pd) pd.onchange=function(){ state.planDate=pd.value; render(); };
-  var planStart=$("planStartDate"), planMode=$("planMode"), planReminderEnabled=$("planReminderEnabled"), planReminderTime=$("planReminderTime");
-  [planStart,planMode,planReminderEnabled,planReminderTime].forEach(function(el){ if(el) el.onchange=function(){ savePlanSetupFromUI(); render(); }; });
+  var planStart=$("planStartDate"), planDuration=$("planDuration"), planReminderEnabled=$("planReminderEnabled"), planReminderTime=$("planReminderTime");
+  [planStart,planDuration,planReminderEnabled,planReminderTime].forEach(function(el){ if(el) el.onchange=function(){ savePlanSetupFromUI(); render(); }; });
   on(scr,"[data-plantoday]",function(b){ b.onclick=function(){ state.planDate=stampOf(new Date()); render(); }; });
+  on(scr,"[data-plandate]",function(b){ b.onclick=function(){ var d=dateAtNoon(state.planDate); d.setDate(d.getDate()+(+b.dataset.plandate)); state.planDate=stampOf(d); render(); }; });
   on(scr,"[data-plan]",function(b){
     b.onclick=function(e){
       if(e.target.closest("[data-planopen]")) return;
@@ -2046,11 +2077,6 @@ function wire(scr){
   var notesEditor=$("notesEditor"), noteTitle=$("noteTitle");
   if(notesEditor) notesEditor.oninput=saveOpenNote;
   if(noteTitle) noteTitle.oninput=saveOpenNote;
-  on(scr,"[data-prayertext]",function(t){
-    var grow=function(){ t.style.height="auto"; t.style.height=Math.max(96,t.scrollHeight)+"px"; };
-    grow();
-    t.oninput=function(){ savePrayer(t.dataset.prayertext,t.value); grow(); };
-  });
   var versionSelect=$("versionSelect");
   if(versionSelect){
     versionSelect.onchange=function(){
@@ -2066,7 +2092,7 @@ function wire(scr){
     b.onclick=function(){ state.historyTab=b.dataset.history; render(); };
   });
   on(scr,"[data-notesection]",function(b){
-    b.onclick=function(){ saveOpenNote(); state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; state.noteSection=b.dataset.notesection; state.noteId=null; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
+    b.onclick=function(){ saveOpenNote(); state.prayerComposer=false; state.prayerId=null; state.prayerDraft=""; state.prayerDraftCategory="Personal"; state.noteSection=b.dataset.notesection; state.noteId=null; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
   });
   on(scr,"[data-notenew]",function(b){
     b.onclick=function(){ var doc=createDoc(b.dataset.notenew); state.noteSection=b.dataset.notenew; state.noteId=doc.id; state.notePreview=false; render(); setTimeout(function(){var t=$("noteTitle");if(t)t.focus();},20); };
@@ -2080,19 +2106,21 @@ function wire(scr){
       else { b.dataset.armed="1"; b.textContent="DELETE?"; }
     };
   });
-  on(scr,"[data-md]",function(b){ b.onclick=function(){ applyMarkdownAction(b.dataset.md); }; });
-  on(scr,"[data-notepreview]",function(b){ b.onclick=function(){ saveOpenNote(); state.notePreview=!state.notePreview; render(); }; });
+  on(scr,"[data-rich]",function(b){ var run=function(e){ e.preventDefault(); applyRichTextAction(b.dataset.rich); }; b.onpointerdown=run; b.onmousedown=function(e){ if(!window.PointerEvent) run(e); }; b.onclick=function(e){ e.preventDefault(); }; });
   on(scr,"[data-prayernew]",function(b){ b.onclick=function(){ state.prayerComposer=true; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); setTimeout(function(){var t=$("prayerDraft");if(t)t.focus();},20); }; });
   var prayerDraft=$("prayerDraft"); if(prayerDraft) prayerDraft.oninput=function(){ state.prayerDraft=prayerDraft.value; };
   var prayerDraftCategory=$("prayerDraftCategory"); if(prayerDraftCategory) prayerDraftCategory.onchange=function(){ state.prayerDraftCategory=prayerDraftCategory.value; };
   on(scr,"[data-prayercancel]",function(b){ b.onclick=function(){ state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); }; });
   on(scr,"[data-prayersave]",function(b){ b.onclick=function(){ var val=$("prayerDraft")?$("prayerDraft").value.trim():state.prayerDraft.trim(); if(!val){ toast("Add a prayer request first"); return; } var cat=$("prayerDraftCategory")?$("prayerDraftCategory").value:state.prayerDraftCategory; createPrayer(val,cat); state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; toast("Prayer request saved"); render(); }; });
+  on(scr,"[data-prayeropen]",function(b){ b.onclick=function(){ state.prayerId=b.dataset.prayeropen; state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); }; });
+  on(scr,"[data-prayerback]",function(b){ b.onclick=function(){ state.prayerId=null; render(); }; });
+  var prayerEditText=$("prayerEditText"), prayerEditCategory=$("prayerEditCategory");
+  if(prayerEditText) prayerEditText.oninput=function(){ if(state.prayerId) savePrayer(state.prayerId,prayerEditText.value); };
+  if(prayerEditCategory) prayerEditCategory.onchange=function(){ if(state.prayerId){ setPrayerCategory(state.prayerId,prayerEditCategory.value); render(); } };
+  on(scr,"[data-prayersaveedit]",function(b){ b.onclick=function(){ var id=b.dataset.prayersaveedit, ta=$("prayerEditText"), cat=$("prayerEditCategory"); if(ta) savePrayer(id,ta.value); if(cat) setPrayerCategory(id,cat.value); state.prayerId=null; toast("Prayer request saved"); render(); }; });
   on(scr,"[data-prayertoggle]",function(b){ b.onclick=function(){ togglePrayer(b.dataset.prayertoggle); render(); }; });
   on(scr,"[data-prayerdelete]",function(b){
-    b.onclick=function(){ if(b.dataset.armed){ deletePrayer(b.dataset.prayerdelete); render(); } else { b.dataset.armed="1"; b.textContent="?"; } };
-  });
-  on(scr,"[data-prayercategory]",function(s){
-    s.onchange=function(){ setPrayerCategory(s.dataset.prayercategory,s.value); render(); };
+    b.onclick=function(){ if(b.dataset.armed){ var id=b.dataset.prayerdelete; deletePrayer(id); if(state.prayerId===id) state.prayerId=null; toast("Prayer request deleted"); render(); } else { b.dataset.armed="1"; b.textContent="DELETE?"; } };
   });
   on(scr,"[data-prayerpin]",function(b){
     b.onclick=function(){ togglePrayerPin(b.dataset.prayerpin); render(); };
@@ -2112,13 +2140,11 @@ function wire(scr){
   });
   var reminderFreq=$("reminderFreq");
   if(reminderFreq){ reminderFreq.onchange=updateReminderFormVisibility; updateReminderFormVisibility(); }
-  on(scr,"[data-pushurlsave]",function(b){ b.onclick=function(){ var inp=$("pushServiceUrl"); if(!inp||!inp.value.trim()){ toast("Enter your deployed push service URL"); return; } savePushServiceUrl(inp.value); toast("Push service URL saved"); render(); }; });
   on(scr,"[data-podcastnotify]",function(b){
     b.onclick=function(){
       var prefs=notificationPrefs();
-      if(prefs.pushConnected){ disconnectPushService().then(function(){ toast("Podcast push disconnected"); render(); }); return; }
-      if(!pushServiceUrl()){ state.returnTab=state.tab; state.tab="settings"; toast("Add the push service URL in Settings"); render(); return; }
-      connectPushService().then(function(){ toast("True new-episode push connected"); render(); }).catch(function(err){ toast(err.message||"Could not connect push"); render(); });
+      if(prefs.pushConnected){ disconnectPushService().then(function(){ toast("New episode alerts are off"); render(); }); return; }
+      connectPushService().then(function(){ toast("New episode alerts are on"); render(); }).catch(function(err){ toast(err.message||"Could not turn on episode alerts"); render(); });
     };
   });
   on(scr,"[data-clearhistory]",function(b){
@@ -2510,7 +2536,7 @@ if(window.matchMedia){
     state.tab=b.dataset.tab;
     state.returnTab=state.tab;
     if(state.tab==="bible") state.bview="read";
-    if(state.tab!=="notes"){ state.noteId=null; state.notePreview=false; state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; }
+    if(state.tab!=="notes"){ state.noteId=null; state.notePreview=false; state.prayerId=null; state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; }
     if(state.tab==="podcast") logActivity("podcast","The Applied Word Podcast","Podcast tab");
     render();
   };

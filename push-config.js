@@ -1,6 +1,6 @@
 /*
-  Production push-service configuration.
-  After deploying push-worker/, paste the Worker URL below and commit this file.
-  Example: window.TAW_PUSH_SERVICE_URL = "https://the-applied-word-push.example.workers.dev";
+  Production push endpoint for The Applied Word Podcast.
+  Deploy push-worker once, paste its URL here, and commit this file.
+  End users never see or enter this URL; they only turn episode alerts on/off.
 */
 window.TAW_PUSH_SERVICE_URL = "";

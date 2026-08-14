@@ -1,19 +1,18 @@
-# The Applied Word Podcast — True New-Episode Push Service
+# The Applied Word Podcast — New Episode Push Service
 
-This Worker turns the app's podcast alert into true background Web Push.
+This Cloudflare Worker provides true background Web Push for the installed PWA.
 
-It does four jobs:
+It:
 
-1. Uses Spotify's **Client Credentials** flow on the server.
-2. Checks show `75QaXUSGooCOG8oqKhuNmG` every five minutes for the newest episode.
-3. Stores browser PushSubscriptions in Cloudflare KV.
-4. When the newest Spotify episode ID changes, sends a Web Push notification to every subscribed device — even when the installed PWA is closed.
+1. Checks the built-in Anchor/Spotify for Creators RSS feed every five minutes.
+2. Reads the newest RSS `<item>` and stores its GUID in Cloudflare KV.
+3. Detects a new episode when the GUID changes.
+4. Sends Web Push to subscribed devices, including when the installed PWA is closed.
+5. Also sends configured M'Cheyne reading-plan reminders.
 
-The first scheduled check only records the current latest episode so existing subscribers are not blasted during setup. Every later episode-ID change triggers a push.
+The podcast feed and Spotify listening URL are already configured in `wrangler.toml`. Listeners never enter either URL and do not need a Spotify account to enable notifications.
 
-## Deploy
-
-You need a free/paid Cloudflare account and a Spotify Developer app.
+## One-time deployment
 
 ### 1. Install dependencies
 
@@ -22,91 +21,57 @@ cd push-worker
 npm install
 ```
 
-### 2. Create a KV namespace
+### 2. Create the KV namespace
 
 ```bash
 npx wrangler kv namespace create SUBSCRIPTIONS
 ```
 
-Copy the returned namespace ID into `wrangler.toml` in place of `REPLACE_WITH_KV_NAMESPACE_ID`.
+Paste the returned namespace ID into `wrangler.toml`.
 
-### 3. Create VAPID keys
+### 3. Generate VAPID keys
 
 ```bash
 npm run generate-vapid
 ```
 
-Copy the two values printed by the script. Store them as Worker secrets:
+Store the keys as Worker secrets:
 
 ```bash
 npx wrangler secret put VAPID_PUBLIC_KEY
 npx wrangler secret put VAPID_PRIVATE_KEY
 ```
 
-The private key must never go into the PWA or GitHub Pages files.
-
-### 4. Add Spotify credentials
-
-Create a Spotify Developer app with Web API access, then add its credentials as Worker secrets:
-
-```bash
-npx wrangler secret put SPOTIFY_CLIENT_ID
-npx wrangler secret put SPOTIFY_CLIENT_SECRET
-```
-
-### 5. Add an admin key
-
-This protects the optional manual `/check` endpoint:
+### 4. Optional admin key
 
 ```bash
 npx wrangler secret put ADMIN_KEY
 ```
 
-### 6. Set the VAPID subject and optional app origin
+### 5. Configure your app origin
 
-Edit `wrangler.toml`:
+Set `APP_ORIGIN` and `VAPID_SUBJECT` in `wrangler.toml`.
 
-```toml
-VAPID_SUBJECT = "mailto:you@example.com"
-APP_ORIGIN = "https://YOUR-GITHUB-USERNAME.github.io"
-```
-
-If your project is at a repository subpath, `APP_ORIGIN` is still only the origin, not the path.
-
-### 7. Deploy
+### 6. Deploy
 
 ```bash
 npm run deploy
 ```
 
-Wrangler will print a URL similar to:
+Wrangler prints a URL similar to:
 
-```text
-https://the-applied-word-push.YOUR-SUBDOMAIN.workers.dev
+`https://the-applied-word-push.YOUR-SUBDOMAIN.workers.dev`
+
+Paste that URL once into the root app file `push-config.js`:
+
+```js
+window.TAW_PUSH_SERVICE_URL = "https://the-applied-word-push.YOUR-SUBDOMAIN.workers.dev";
 ```
 
-Open the PWA → **Settings → Notifications → Podcast push service**, paste that URL, tap **Save URL**, then **Connect**.
+Commit and publish the app. From then on, listeners only tap **Turn On** for episode alerts.
 
-On iPhone/iPad, Web Push requires the site to be installed as a Home Screen web app. Notification permission must also be granted by the user.
+## Detection behavior
 
-## Testing
+The first scheduled check records the current newest RSS item without notifying everyone. Later GUID changes trigger a push. Notification taps open the Spotify show.
 
-Run locally with scheduled-handler testing enabled:
-
-```bash
-npm run dev
-```
-
-Trigger the scheduled check with Wrangler's scheduled test route. You can also call `/check` with your admin key:
-
-```bash
-curl -X POST \
-  -H "X-Admin-Key: YOUR_ADMIN_KEY" \
-  https://YOUR-WORKER.workers.dev/check
-```
-
-`GET /latest` returns the newest Spotify episode that the app displays in the Podcast tab.
-
-## Reading-plan push reminders
-
-When the PWA is connected to this Worker, its M’Cheyne reading reminder settings are synchronized to the subscription. The same five-minute Cron Trigger can therefore send the daily reading reminder while the app is closed. If the push backend is not connected, the PWA falls back to its local in-app reminder checker.
+`GET /latest` exposes the newest episode metadata to the Podcast tab.

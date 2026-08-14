@@ -57,45 +57,48 @@ function localParts(now,timeZone){
 }
 function minutesOf(time){ const p=String(time||"07:00").split(":"); return (+p[0]||0)*60+(+p[1]||0); }
 
-async function getSpotifyToken(env) {
-  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) {
-    throw new Error("Spotify client credentials are not configured");
-  }
-  const basic = btoa(`${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`);
-  const response = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${basic}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: "grant_type=client_credentials"
-  });
-  if (!response.ok) throw new Error(`Spotify token request failed (${response.status})`);
-  const data = await response.json();
-  return data.access_token;
+function decodeXmlText(value){
+  return String(value||"")
+    .replace(/^<!\[CDATA\[|\]\]>$/g,"")
+    .replace(/<[^>]+>/g," ")
+    .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
+    .replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'")
+    .replace(/&#(\d+);/g,(_m,n)=>String.fromCharCode(+n))
+    .replace(/&#x([0-9a-f]+);/gi,(_m,n)=>String.fromCharCode(parseInt(n,16)))
+    .replace(/\s+/g," ").trim();
 }
-
+function tagValue(block,tag){
+  const m=String(block||"").match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`,"i"));
+  return m?decodeXmlText(m[1]):"";
+}
 async function getLatestEpisode(env) {
-  const token = await getSpotifyToken(env);
-  const showId = env.SPOTIFY_SHOW_ID || "75QaXUSGooCOG8oqKhuNmG";
-  const response = await fetch(`https://api.spotify.com/v1/shows/${encodeURIComponent(showId)}/episodes?market=US&limit=1&offset=0`, {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Spotify episodes request failed (${response.status}): ${body.slice(0, 180)}`);
-  }
-  const data = await response.json();
-  const ep = data.items && data.items[0];
-  if (!ep) throw new Error("Spotify returned no episodes for this show");
+  const rssUrl = env.PODCAST_RSS_URL || "https://anchor.fm/s/11003f2bc/podcast/rss";
+  const showUrl = env.SPOTIFY_SHOW_URL || "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG";
+  const response = await fetch(rssUrl,{headers:{"User-Agent":"TheAppliedWordPush/1.0 (+podcast episode notifier)"}});
+  if (!response.ok) throw new Error(`Podcast RSS request failed (${response.status})`);
+  const xml = await response.text();
+  const itemMatch = xml.match(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/i);
+  if (!itemMatch) throw new Error("Podcast RSS returned no episode items");
+  const item=itemMatch[1];
+  const title=tagValue(item,"title") || "New episode";
+  const guid=tagValue(item,"guid");
+  const pubDate=tagValue(item,"pubDate");
+  const description=tagValue(item,"description");
+  const itemLink=tagValue(item,"link");
+  const enclosure=item.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
+  const id=guid || (enclosure&&enclosure[1]) || `${title}|${pubDate}`;
+  let releaseDate="";
+  if(pubDate){ const d=new Date(pubDate); if(!Number.isNaN(d.getTime())) releaseDate=d.toISOString().slice(0,10); }
   return {
-    id: ep.id,
-    name: ep.name,
-    description: ep.description || "",
-    release_date: ep.release_date || "",
-    release_date_precision: ep.release_date_precision || "day",
-    duration_ms: ep.duration_ms || 0,
-    url: ep.external_urls && ep.external_urls.spotify ? ep.external_urls.spotify : `https://open.spotify.com/episode/${ep.id}`
+    id,
+    name:title,
+    description,
+    release_date:releaseDate,
+    release_date_precision:"day",
+    duration_ms:0,
+    url:showUrl,
+    episode_url:itemLink||showUrl,
+    source:"rss"
   };
 }
 
@@ -176,7 +179,8 @@ async function sendDueReadingReminders(env){
       const pref=record.preferences&&record.preferences.readingReminder;
       if(!pref||!pref.enabled) continue;
       const local=localParts(now,pref.timezone||"UTC"), idx=dateIndex(pref.startDate,local.date);
-      if(idx===null||idx<0||idx>=365||local.minutes<minutesOf(pref.time)||record.lastReadingKey===local.date) continue;
+      const maxDays=pref.duration==="sixmonth"?183:365;
+      if(idx===null||idx<0||idx>=maxDays||local.minutes<minutesOf(pref.time)||record.lastReadingKey===local.date) continue;
       try{
         await sendReadingPush(record.subscription,env); sent++;
         record.lastReadingKey=local.date;
@@ -221,8 +225,9 @@ async function handleFetch(request, env) {
     return json({
       ok: true,
       publicKey: env.VAPID_PUBLIC_KEY || "",
-      spotifyConfigured: !!(env.SPOTIFY_CLIENT_ID && env.SPOTIFY_CLIENT_SECRET),
-      showId: env.SPOTIFY_SHOW_ID || "75QaXUSGooCOG8oqKhuNmG"
+      source: "rss",
+      rssUrl: env.PODCAST_RSS_URL || "https://anchor.fm/s/11003f2bc/podcast/rss",
+      showUrl: env.SPOTIFY_SHOW_URL || "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG"
     }, 200, cors);
   }
 

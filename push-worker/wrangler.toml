@@ -11,7 +11,8 @@ binding = "SUBSCRIPTIONS"
 id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
 [vars]
-SPOTIFY_SHOW_ID = "75QaXUSGooCOG8oqKhuNmG"
+PODCAST_RSS_URL = "https://anchor.fm/s/11003f2bc/podcast/rss"
+SPOTIFY_SHOW_URL = "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG"
 VAPID_SUBJECT = "mailto:replace-with-your-email@example.com"
 # Optional. Set to your GitHub Pages origin, e.g. https://username.github.io
 APP_ORIGIN = ""

@@ -1,5 +1,5 @@
 /* The Applied Word Podcast — app shell cache */
-var CACHE = "applied-word-v24";
+var CACHE = "applied-word-v25";
 var SHELL = [
   "./", "./index.html", "./styles.css", "./push-config.js", "./content.js", "./mcheyne.js",
   "./bible.js", "./app.js", "./manifest.webmanifest",
