@@ -1,11 +1,11 @@
-# The Applied Word — app
+# The Applied Word Podcast — app
 
-This is a static, installable PWA for **The Applied Word**. It has no build step.
+This is a static, installable PWA for **The Applied Word Podcast**. It has no build step.
 
 ## Main tabs
 
-- **Devotion** — Today’s devotional, the M’Cheyne reading plan, and Spurgeon’s *Morning and Evening*.
-- **Podcast** — The Applied Word Spotify show embedded directly in the app, plus buttons to open/follow the show in Spotify.
+- **Devotion** — Today’s devotional and the M’Cheyne reading plan.
+- **Podcast** — The Applied Word Podcast Spotify show embedded directly in the app, plus buttons to open/follow the show in Spotify.
 - **Bible** — A full Berean Standard Bible reader.
 - **History** — Recent reading/activity plus saved highlights, notes, and bookmarks.
 
@@ -53,17 +53,14 @@ Change those two values if the show URL ever changes.
 
 The complete Bible reader now works on static hosting because the BSB source file is included locally. GitHub Pages, Netlify, Cloudflare Pages, or another HTTPS static host can serve the app.
 
-The Spurgeon tab also works on plain static hosting. On first use it downloads the complete public-domain *Morning and Evening* dataset and stores it in IndexedDB for future/offline reading.
-
-The Cloudflare Pages function in `functions/spurgeon/[[path]].js` is retained only as a compatibility fallback; it is not required for GitHub Pages.
 
 ### Cloudflare Pages
 
-No build command is required. Set the output directory to the repository root. Cloudflare Pages will also run the optional Spurgeon fallback function automatically.
+No build command is required. Set the output directory to the repository root.
 
 ## Brand assets
 
-- `assets/podcast-cover.jpg` — supplied Applied Word artwork used on the Podcast tab
+- `assets/podcast-cover.png` — supplied The Applied Word Podcast artwork used on the Podcast tab
 - `icons/icon-master.svg` — editable app-icon source
 - `icons/icon-192.png`
 - `icons/icon-512.png`
@@ -77,7 +74,7 @@ The refreshed icon uses the same dark leather and muted-gold shield / sword / co
 
 The app keeps reading data on the device:
 
-- IndexedDB: downloaded BSB text and cached Spurgeon Morning & Evening collection
+- IndexedDB: downloaded BSB text
 - localStorage: highlights, notes, bookmarks, streak, plan completion, reader text size, and activity history
 
 Settings includes an export for marks/bookmarks/activity and reset controls.
@@ -94,7 +91,3 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 - `sw.js` — offline app-shell service worker
 - `manifest.webmanifest` — PWA metadata
 
-
-## Spurgeon Morning & Evening
-
-The Spurgeon tab downloads the public-domain dataset once and caches it in IndexedDB, so it works on GitHub Pages and offline after the first successful load. The static dataset comes from the `russianryebread/morning-and-evening` repository; CCEL remains the source link and compatibility fallback.

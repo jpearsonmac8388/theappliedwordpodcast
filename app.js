@@ -1,5 +1,5 @@
 /* ============================================================
-   THE APPLIED WORD — app
+   THE APPLIED WORD PODCAST — app
    ============================================================ */
 
 var SHOW_URL  = "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG";
@@ -43,7 +43,7 @@ var state = {
   searchQuery: "",
   fontScale: Math.max(.85, Math.min(1.35, +(ls("fontScale") || 1))),
   // devotion
-  devMode: "today",                // today | plan | spurgeon
+  devMode: "today",                // today | plan
   spDate: stampOf(new Date()),
   spHalf: "morning",
   spData: null, spState: "idle",
@@ -152,7 +152,6 @@ function anyInstalled(){ return Object.keys(state.meta).length>0; }
    ============================================================ */
 function devotionView(){
   if(state.devMode==="plan") return plansView();
-  if(state.devMode==="spurgeon") return spurgeonView();
 
   var d=today(), n=dayOfYear(d);
   var dev=DEVOTIONS[(n-1) % DEVOTIONS.length];
@@ -165,9 +164,8 @@ function devotionView(){
       "<br>TODAY'S WORD</div></div>"+
 
     '<div class="tabsel devotion-tabs" style="margin-top:18px">'+
-      '<button class="on" data-dev="today">TODAY</button>'+
-      '<button data-dev="plan">PLAN</button>'+
-      '<button data-dev="spurgeon">SPURGEON</button>'+
+      '<button class="'+(state.devMode==="today"?"on":"")+'" data-dev="today">TODAY</button>'+
+      '<button class="'+(state.devMode==="plan"?"on":"")+'" data-dev="plan">PLAN</button>'+
     '</div>'+
 
     '<h1>'+esc(dev.title[0])+'<br><em>'+esc(dev.title[1])+'</em></h1>'+
@@ -397,20 +395,20 @@ function parseSpurgeon(html){
    ============================================================ */
 function podcastView(){
   return '<div class="pad podcast-page">'+
-    '<div class="eyebrow">The Applied Word podcast</div>'+
+    '<div class="eyebrow">The Applied Word Podcast</div>'+
     '<h1 style="font-size:34px">LISTEN <em>HERE</em></h1><div class="rule" style="margin-bottom:14px"></div>'+
     '<div class="podcast-hero">'+
-      '<img src="assets/podcast-cover.jpg" alt="The Applied Word podcast cover" class="podcast-cover">'+
+      '<img src="assets/podcast-cover.png" alt="The Applied Word Podcast cover" class="podcast-cover">'+
       '<div><div class="podcast-title">Sharpening the man through the Message.</div>'+
       '<p class="muted">Play the weekly devotional without leaving the app, or open the show in Spotify.</p></div>'+
     '</div>'+
-    '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word on Spotify" loading="lazy" '+
+    '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" '+
       'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
     '<a class="cta" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
     '<a class="cta ghost" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="follow">FOLLOW THE SHOW</a>'+
     '<div class="where"><h4>PLAYER TROUBLE?</h4>'+
       '<p class="muted">If your browser blocks the embedded player, open the show in Spotify with the button above.</p></div>'+
-    '<div class="foot">THE APPLIED WORD · WEEKLY DEVOTIONAL FOR MEN</div></div>';
+    '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
 function planDone(){ return jget("plandone",{}); }
@@ -460,7 +458,6 @@ function plansView(){
     '<div class="tabsel devotion-tabs" style="margin-top:10px">'+
       '<button data-dev="today">TODAY</button>'+
       '<button class="on" data-dev="plan">PLAN</button>'+
-      '<button data-dev="spurgeon">SPURGEON</button>'+
     '</div>'+
     '<h1 style="font-size:33px;margin-top:22px">M\u2019CHEYNE</h1><div class="rule" style="margin-bottom:12px"></div>'+
     '<p class="muted">Robert Murray M\u2019Cheyne wrote this calendar for his church in Dundee in '+
@@ -507,7 +504,7 @@ function bibleView(){
     return '<div class="v'+(state.sel&&state.sel.v===v?" sel":"")+'"'+
       (m&&m.hl?' data-hl="'+m.hl+'"':'')+' data-v="'+v+'">'+
       '<div class="v-no">'+v+'</div>'+
-      '<div class="v-tx">'+esc(text)+'</div>'+
+      '<div class="v-tx"><span class="v-tx-inner">'+esc(text)+'</span></div>'+
       (m&&m.note?'<div class="marks"><span title="note">&#9998;</span></div>':'')+
     '</div>';
   }).join("");
@@ -820,83 +817,174 @@ function drawCard(){
   var dim=RATIOS[state.cardRatio], W=dim[0], H=dim[1];
   cvs.width=W; cvs.height=H;
   var x=cvs.getContext("2d");
+  var shortCard=H <= W*1.10;
 
-  // background + glow, matching the app
-  x.fillStyle="#1E140C"; x.fillRect(0,0,W,H);
-  var g=x.createRadialGradient(W/2,H*0.10,0,W/2,H*0.10,W*1.05);
-  g.addColorStop(0,"rgba(209,169,78,0.18)");
-  g.addColorStop(1,"rgba(209,169,78,0)");
-  x.fillStyle=g; x.fillRect(0,0,W,H);
-
-  var pad=Math.round(W*0.105);
-
-  // corner brackets
-  x.strokeStyle="rgba(209,169,78,0.85)"; x.lineWidth=Math.max(3,W*0.004);
-  var bl=W*0.055, o=pad*0.62;
-  x.beginPath();
-  x.moveTo(o,o+bl); x.lineTo(o,o); x.lineTo(o+bl,o);
-  x.moveTo(W-o-bl,H-o); x.lineTo(W-o,H-o); x.lineTo(W-o,H-o-bl);
-  x.stroke();
-
-  // wordmark
-  x.textAlign="center"; x.fillStyle="#E4C374";
-  x.font="700 "+Math.round(W*0.026)+"px 'JetBrains Mono',monospace";
-  x.fillText("T H E   A P P L I E D   W O R D", W/2, pad*1.5);
-
-  // verse text, wrapped
-  var size=Math.round(W*0.072);
-  var maxW=W-pad*2;
-  var words=cv.text.split(/\s+/), lines=[], line="";
-  x.font="italic "+size+"px Lora,Georgia,serif";
-  for(var i=0;i<words.length;i++){
-    var t=line?line+" "+words[i]:words[i];
-    if(x.measureText(t).width>maxW && line){ lines.push(line); line=words[i]; }
-    else line=t;
+  function roundedRect(x0,y0,w,h,r){
+    x.beginPath();
+    x.moveTo(x0+r,y0); x.lineTo(x0+w-r,y0);
+    x.quadraticCurveTo(x0+w,y0,x0+w,y0+r);
+    x.lineTo(x0+w,y0+h-r);
+    x.quadraticCurveTo(x0+w,y0+h,x0+w-r,y0+h);
+    x.lineTo(x0+r,y0+h);
+    x.quadraticCurveTo(x0,y0+h,x0,y0+h-r);
+    x.lineTo(x0,y0+r);
+    x.quadraticCurveTo(x0,y0,x0+r,y0);
+    x.closePath();
   }
-  if(line) lines.push(line);
 
-  // shrink to fit long verses
-  while(lines.length*size*1.42 > H*0.52 && size>Math.round(W*0.035)){
-    size-=Math.round(W*0.004);
-    x.font="italic "+size+"px Lora,Georgia,serif";
-    lines=[]; line="";
-    for(var j=0;j<words.length;j++){
-      var t2=line?line+" "+words[j]:words[j];
-      if(x.measureText(t2).width>maxW && line){ lines.push(line); line=words[j]; }
-      else line=t2;
-    }
+  function seeded(i){
+    var n=Math.sin(i*12.9898+78.233)*43758.5453;
+    return n-Math.floor(n);
+  }
+
+  function drawMark(cx,cy,s){
+    x.save();
+    x.translate(cx,cy);
+    x.strokeStyle="#D5B767";
+    x.fillStyle="rgba(39,24,17,.42)";
+    x.lineCap="round"; x.lineJoin="round";
+    x.lineWidth=Math.max(2,s*.026);
+
+    // Shield.
+    x.beginPath();
+    x.moveTo(-s*.43,-s*.28); x.quadraticCurveTo(0,-s*.45,s*.43,-s*.28);
+    x.lineTo(s*.37,s*.20); x.quadraticCurveTo(s*.30,s*.48,0,s*.67);
+    x.quadraticCurveTo(-s*.30,s*.48,-s*.37,s*.20); x.closePath();
+    x.fill(); x.stroke();
+
+    // Sword.
+    x.lineWidth=Math.max(2,s*.022);
+    x.beginPath(); x.moveTo(0,-s*.58); x.lineTo(0,s*.42); x.stroke();
+    x.beginPath(); x.moveTo(-s*.16,-s*.24); x.lineTo(s*.16,-s*.24); x.stroke();
+    x.beginPath(); x.moveTo(0,-s*.68); x.lineTo(s*.055,-s*.57); x.lineTo(0,-s*.48); x.lineTo(-s*.055,-s*.57); x.closePath(); x.stroke();
+
+    // Open book.
+    x.beginPath();
+    x.moveTo(-s*.27,s*.06); x.quadraticCurveTo(-s*.14,-s*.02,-s*.02,s*.06); x.lineTo(-s*.02,s*.28); x.quadraticCurveTo(-s*.15,s*.20,-s*.27,s*.26); x.closePath();
+    x.moveTo(s*.27,s*.06); x.quadraticCurveTo(s*.14,-s*.02,s*.02,s*.06); x.lineTo(s*.02,s*.28); x.quadraticCurveTo(s*.15,s*.20,s*.27,s*.26); x.closePath();
+    x.stroke();
+
+    // Compass star.
+    x.beginPath();
+    x.arc(0,-s*.02,s*.19,0,Math.PI*2); x.stroke();
+    x.beginPath();
+    x.moveTo(0,-s*.22); x.lineTo(s*.055,-s*.07); x.lineTo(s*.20,-s*.02); x.lineTo(s*.055,s*.03);
+    x.lineTo(0,s*.18); x.lineTo(-s*.055,s*.03); x.lineTo(-s*.20,-s*.02); x.lineTo(-s*.055,-s*.07); x.closePath();
+    x.stroke();
+    x.restore();
+  }
+
+  function wrappedLines(text,maxW,size,weight,style){
+    x.font=(style||"")+" "+(weight||"400")+" "+size+"px 'Lora', Georgia, serif";
+    var words=String(text).trim().split(/\s+/), lines=[], line="";
+    words.forEach(function(word){
+      var trial=line ? line+" "+word : word;
+      if(line && x.measureText(trial).width>maxW){ lines.push(line); line=word; }
+      else line=trial;
+    });
     if(line) lines.push(line);
+    return lines;
   }
 
-  var blockH=lines.length*size*1.42;
-  var startY=(H-blockH)/2 - H*0.02;
+  // Smooth coffee-brown leather, closer to the podcast cover.
+  x.fillStyle="#3B281F"; x.fillRect(0,0,W,H);
+  var leather=x.createLinearGradient(0,0,W,H);
+  leather.addColorStop(0,"rgba(118,79,55,.27)");
+  leather.addColorStop(.32,"rgba(76,47,34,.08)");
+  leather.addColorStop(.68,"rgba(34,22,17,.08)");
+  leather.addColorStop(1,"rgba(18,12,9,.32)");
+  x.fillStyle=leather; x.fillRect(0,0,W,H);
 
-  x.textAlign="left"; x.fillStyle="#F0E4CC";
-  x.font="italic "+size+"px Lora,Georgia,serif";
-  for(var k=0;k<lines.length;k++){
-    x.fillText(lines[k], pad, startY + k*size*1.42);
+  var glow=x.createRadialGradient(W*.50,H*.38,0,W*.50,H*.38,Math.max(W,H)*.72);
+  glow.addColorStop(0,"rgba(172,117,78,.18)");
+  glow.addColorStop(.58,"rgba(96,59,42,.08)");
+  glow.addColorStop(1,"rgba(0,0,0,0)");
+  x.fillStyle=glow; x.fillRect(0,0,W,H);
+
+  // Fine deterministic leather grain.
+  for(var i=0;i<1300;i++){
+    var rx=seeded(i*3)*W, ry=seeded(i*3+1)*H;
+    var alpha=.012+seeded(i*3+2)*.020;
+    x.fillStyle=(i%2?"rgba(255,239,210,":"rgba(15,8,5,")+alpha+")";
+    x.fillRect(rx,ry,1+seeded(i+50)*3,1+seeded(i+80)*1.6);
   }
 
-  // rule + reference
-  var refY=startY+blockH+size*0.55;
-  x.strokeStyle="#D1A94E"; x.lineWidth=Math.max(4,W*0.006);
-  x.beginPath(); x.moveTo(pad,refY); x.lineTo(pad+W*0.14,refY); x.stroke();
+  // Vignette.
+  var vign=x.createRadialGradient(W/2,H/2,Math.min(W,H)*.18,W/2,H/2,Math.max(W,H)*.78);
+  vign.addColorStop(.60,"rgba(0,0,0,0)");
+  vign.addColorStop(1,"rgba(11,7,5,.42)");
+  x.fillStyle=vign; x.fillRect(0,0,W,H);
 
-  x.fillStyle="#E4C374";
-  x.font="700 "+Math.round(W*0.030)+"px 'JetBrains Mono',monospace";
-  x.fillText(cv.ref.toUpperCase()+"  ·  "+(cv.abbr||"BSB"), pad, refY+W*0.072);
+  var gold="#D4B566", goldLight="#E5CE8D", goldDark="#92723A";
+  var outer=W*.055, inner=W*.072;
 
-  // footer
-  x.textAlign="center"; x.fillStyle="rgba(183,154,120,0.85)";
-  x.font="700 "+Math.round(W*0.021)+"px 'JetBrains Mono',monospace";
-  x.fillText("N O   F L U F F .   J U S T   T H E   W O R D   A N D   T H E   W A L K .", W/2, H-pad*0.85);
+  // Embossed double border.
+  roundedRect(outer,outer,W-outer*2,H-outer*2,W*.025);
+  x.strokeStyle="rgba(223,193,114,.58)"; x.lineWidth=Math.max(2,W*.003); x.stroke();
+  roundedRect(inner,inner,W-inner*2,H-inner*2,W*.020);
+  x.strokeStyle="rgba(112,81,46,.78)"; x.lineWidth=Math.max(2,W*.0023); x.stroke();
+
+  // Antique corner protectors.
+  var cs=W*.075;
+  x.fillStyle="rgba(177,139,68,.72)";
+  x.beginPath(); x.moveTo(outer,outer); x.lineTo(outer+cs,outer); x.lineTo(outer,outer+cs); x.closePath(); x.fill();
+  x.beginPath(); x.moveTo(W-outer,outer); x.lineTo(W-outer-cs,outer); x.lineTo(W-outer,outer+cs); x.closePath(); x.fill();
+  x.beginPath(); x.moveTo(outer,H-outer); x.lineTo(outer+cs,H-outer); x.lineTo(outer,H-outer-cs); x.closePath(); x.fill();
+  x.beginPath(); x.moveTo(W-outer,H-outer); x.lineTo(W-outer-cs,H-outer); x.lineTo(W-outer,H-outer-cs); x.closePath(); x.fill();
+
+  // Kicker + crest + brand.
+  x.textAlign="center"; x.textBaseline="middle";
+  x.fillStyle=goldLight;
+  x.font="500 "+Math.round(W*.018)+"px 'JetBrains Mono', monospace";
+  x.fillText("A WEEKLY DEVOTIONAL FOR MEN",W/2,H*(shortCard?.105:.075));
+
+  var markY=H*(shortCard?.19:.155), markS=W*(shortCard?.115:.13);
+  drawMark(W/2,markY,markS);
+
+  var brandY=H*(shortCard?.29:.245);
+  x.fillStyle=gold;
+  x.shadowColor="rgba(18,10,7,.55)"; x.shadowBlur=W*.008; x.shadowOffsetY=W*.004;
+  x.font="700 "+Math.round(W*.030)+"px 'Roboto Slab', Georgia, serif";
+  x.fillText("THE APPLIED WORD PODCAST",W/2,brandY);
+  x.shadowColor="transparent"; x.shadowBlur=0; x.shadowOffsetY=0;
+  x.strokeStyle="rgba(212,181,102,.72)"; x.lineWidth=Math.max(2,W*.0024);
+  x.beginPath(); x.moveTo(W*.26,brandY+W*.037); x.lineTo(W*.74,brandY+W*.037); x.stroke();
+
+  // Verse block — antique gold serif, centered like the updated cover art.
+  var pad=W*.13, maxW=W-pad*2;
+  var size=Math.round(W*(shortCard?.052:.058));
+  var maxBlock=H*(shortCard?.36:.40), lines=wrappedLines(cv.text,maxW,size,"700","");
+  while(lines.length*size*1.34>maxBlock && size>Math.round(W*.031)){
+    size-=Math.max(2,Math.round(W*.0028));
+    lines=wrappedLines(cv.text,maxW,size,"700","");
+  }
+  var lineH=size*1.34, blockH=lines.length*lineH;
+  var verseCenter=H*(shortCard?.56:.565), startY=verseCenter-blockH/2+lineH*.48;
+  x.font="700 "+size+"px 'Lora', Georgia, serif";
+  x.fillStyle=goldLight;
+  x.textAlign="center";
+  x.shadowColor="rgba(27,16,11,.68)"; x.shadowBlur=W*.006; x.shadowOffsetY=W*.003;
+  for(var k=0;k<lines.length;k++) x.fillText(lines[k],W/2,startY+k*lineH);
+  x.shadowColor="transparent"; x.shadowBlur=0; x.shadowOffsetY=0;
+
+  // Reference and footer.
+  var refY=Math.min(H*(shortCard?.805:.80), startY+blockH+W*.07);
+  x.strokeStyle="rgba(212,181,102,.82)"; x.lineWidth=Math.max(2,W*.0025);
+  x.beginPath(); x.moveTo(W*.33,refY-W*.035); x.lineTo(W*.67,refY-W*.035); x.stroke();
+  x.fillStyle=gold;
+  x.font="700 "+Math.round(W*.029)+"px 'JetBrains Mono', monospace";
+  x.fillText(cv.ref.toUpperCase()+" · "+(cv.abbr||"BSB"),W/2,refY);
+
+  x.fillStyle="rgba(229,206,141,.86)";
+  x.font="italic "+Math.round(W*.025)+"px 'Lora', Georgia, serif";
+  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.91:.91));
 }
 
 function saveCard(){
   var cvs=$("cardCanvas"); if(!cvs) return;
   cvs.toBlob(function(blob){
     if(!blob) return toast("Couldn't build the image");
-    var name="applied-word-"+state.cardVerse.ref.replace(/[^\w]+/g,"-").toLowerCase()+
+    var name="the-applied-word-podcast-"+state.cardVerse.ref.replace(/[^\w]+/g,"-").toLowerCase()+
       "-"+state.cardRatio.replace(":","x")+".png";
     var file=null;
     try{ file=new File([blob],name,{type:"image/png"}); }catch(e){}
@@ -1173,7 +1261,7 @@ function wire(scr){
     b.onclick=function(){ openRef(b.dataset.openref); };
   });
   on(scr,"[data-podact]",function(b){
-    b.onclick=function(){ logActivity("podcast","The Applied Word","Spotify"); };
+    b.onclick=function(){ logActivity("podcast","The Applied Word Podcast","Spotify"); };
   });
 
   // Settings / Bible library
@@ -1200,7 +1288,7 @@ function wire(scr){
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
-      a.href=url; a.download="applied-word-data.json";
+      a.href=url; a.download="the-applied-word-podcast-data.json";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(url); },5000);
       toast("Exported");
@@ -1324,7 +1412,7 @@ function initSheet(){
   b.onclick=function(){
     state.tab=b.dataset.tab;
     if(state.tab==="bible") state.bview="read";
-    if(state.tab==="podcast") logActivity("podcast","The Applied Word","Podcast tab");
+    if(state.tab==="podcast") logActivity("podcast","The Applied Word Podcast","Podcast tab");
     render();
   };
 });

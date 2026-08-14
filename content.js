@@ -1,5 +1,5 @@
 /* ============================================================
-   THE APPLIED WORD — devotions
+   THE APPLIED WORD PODCAST — devotions
    Edit this file to change what men read. The app shows one per
    day and loops. Copy a block, change the words, done.
 

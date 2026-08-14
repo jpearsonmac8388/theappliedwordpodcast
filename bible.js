@@ -1,5 +1,5 @@
 /* ============================================================
-   THE APPLIED WORD — Bible engine
+   THE APPLIED WORD PODCAST — Bible engine
    Storage, downloading, and parsing for the Berean Bible tiers.
    ============================================================ */
 

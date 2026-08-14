@@ -1,11 +1,11 @@
-/* The Applied Word — app shell cache */
-var CACHE = "applied-word-v8";
+/* The Applied Word Podcast — app shell cache */
+var CACHE = "applied-word-v10";
 var SHELL = [
   "./", "./index.html", "./styles.css", "./content.js", "./mcheyne.js",
   "./bible.js", "./app.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png", "./icons/favicon.png",
-  "./assets/podcast-cover.jpg"
+  "./assets/podcast-cover.png"
 ];
 
 self.addEventListener("install", function (e) {

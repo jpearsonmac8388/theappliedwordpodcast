@@ -1,4 +1,4 @@
-/* THE APPLIED WORD — styles */
+/* THE APPLIED WORD PODCAST — styles */
 
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -106,19 +106,19 @@ button,.cta{font-family:var(--util);cursor:pointer}
 .chapter-sub{font-family:var(--util);font-size:10px;letter-spacing:.16em;color:var(--ash);margin-bottom:20px}
 
 .v{padding:7px 10px;margin:0 -10px 3px;border-radius:2px;cursor:pointer;
-  display:flex;gap:10px;align-items:baseline;transition:background .12s}
+  display:flex;gap:10px;align-items:flex-start;transition:background .12s}
 .v:hover{background:rgba(209,169,78,.03)}
 .v.sel{background:rgba(209,169,78,.18);box-shadow:inset 2px 0 0 var(--rust)}
 .v-no{font-family:var(--util);font-size:9.5px;color:var(--rust);min-width:20px;
   flex-shrink:0;padding-top:4px;font-weight:700}
-.v-tx{font-family:var(--scrip);font-size:17px;line-height:1.68;color:rgba(240,228,204,.88)}
-.v[data-hl] .v-tx{padding:1px 0}
-.v[data-hl="gold"]   .v-tx{box-shadow:inset 0 -.62em 0 rgba(212,175,55,.30)}
-.v[data-hl="rust"]   .v-tx{box-shadow:inset 0 -.62em 0 rgba(168,93,63,.34)}
-.v[data-hl="green"]  .v-tx{box-shadow:inset 0 -.62em 0 rgba(122,139,90,.34)}
-.v[data-hl="blue"]   .v-tx{box-shadow:inset 0 -.62em 0 rgba(92,122,138,.36)}
-.v[data-hl="violet"] .v-tx{box-shadow:inset 0 -.62em 0 rgba(122,92,116,.36)}
-.v .marks{margin-left:auto;display:flex;gap:5px;align-items:center;flex-shrink:0;padding-top:3px}
+.v-tx{font-family:var(--scrip);font-size:17px;line-height:1.68;color:rgba(240,228,204,.88);flex:1;min-width:0}
+.v-tx-inner{display:inline;line-height:1.68;-webkit-box-decoration-break:clone;box-decoration-break:clone;padding:.04em .12em .08em;border-radius:2px}
+.v[data-hl="gold"]   .v-tx-inner{background-color:rgba(212,175,55,.30)}
+.v[data-hl="rust"]   .v-tx-inner{background-color:rgba(168,93,63,.31)}
+.v[data-hl="green"]  .v-tx-inner{background-color:rgba(122,139,90,.31)}
+.v[data-hl="blue"]   .v-tx-inner{background-color:rgba(92,122,138,.33)}
+.v[data-hl="violet"] .v-tx-inner{background-color:rgba(122,92,116,.33)}
+.v .marks{margin-left:auto;display:flex;gap:5px;align-items:center;flex-shrink:0;padding-top:5px}
 .v .marks span{font-size:10px;opacity:.85}
 
 /* verse action sheet */
@@ -306,8 +306,7 @@ header{
 }
 .brand-lockup{display:flex;align-items:center;gap:9px;min-width:0}
 .brand-icon{width:34px;height:34px;border-radius:9px;box-shadow:0 5px 14px rgba(0,0,0,.26)}
-.brand-kicker{font-family:var(--util);font-size:7px;letter-spacing:.24em;color:var(--ash);line-height:1}
-.brand-lockup .wordmark{font-size:10px;letter-spacing:.17em;color:var(--brass);margin-top:4px;white-space:nowrap}
+.brand-lockup .wordmark{font-family:var(--slab);font-size:11px;font-weight:700;letter-spacing:.055em;color:var(--brass);line-height:1.15;white-space:normal;max-width:190px;text-transform:none}
 .header-tools{display:flex;align-items:center;gap:8px}
 .icon-btn{
   width:34px;height:34px;border-radius:50%;border:1px solid rgba(224,194,122,.18);
