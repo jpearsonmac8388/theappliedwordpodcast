@@ -1,7 +1,7 @@
 /* The Applied Word Podcast — app shell cache */
-var CACHE = "applied-word-v23";
+var CACHE = "applied-word-v24";
 var SHELL = [
-  "./", "./index.html", "./styles.css", "./content.js", "./mcheyne.js",
+  "./", "./index.html", "./styles.css", "./push-config.js", "./content.js", "./mcheyne.js",
   "./bible.js", "./app.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png", "./icons/favicon.png",
@@ -54,4 +54,27 @@ self.addEventListener("notificationclick", function (e) {
     }
     return clients.openWindow?clients.openWindow(absolute):null;
   }));
+});
+
+
+/* True background Web Push. The backend payload is JSON. */
+self.addEventListener("push", function(e){
+  var data={title:"The Applied Word Podcast",body:"A new update is ready.",url:"./",tag:"taw-push"};
+  try{
+    if(e.data){
+      var incoming=e.data.json();
+      if(incoming && typeof incoming==="object") data=Object.assign(data,incoming);
+    }
+  }catch(err){
+    try{ data.body=e.data?e.data.text():data.body; }catch(ignore){}
+  }
+  var options={
+    body:data.body||"",
+    icon:data.icon||"icons/icon-192.png",
+    badge:data.badge||"icons/favicon.png",
+    tag:data.tag||"taw-push",
+    renotify:false,
+    data:{url:data.url||"./",type:data.type||"push",episodeId:data.episodeId||""}
+  };
+  e.waitUntil(self.registration.showNotification(data.title||"The Applied Word Podcast",options));
 });

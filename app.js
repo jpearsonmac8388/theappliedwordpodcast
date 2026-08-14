@@ -165,7 +165,12 @@ var state = {
   notePreview: false,
   reminderTarget: null,
   returnTab: "devotion",
-  categoryOpen: null
+  categoryOpen: null,
+  latestEpisode: null,
+  latestEpisodeFetched: 0,
+  prayerComposer: false,
+  prayerDraft: "",
+  prayerDraftCategory: "Personal"
 };
 try{
   var initialParams=new URLSearchParams(location.search);
@@ -173,6 +178,7 @@ try{
   if(["devotion","podcast","bible","notes","history"].indexOf(initialTab)>-1) state.tab=initialTab;
   if(["sermon","prayer","study","men"].indexOf(initialSection)>-1) state.noteSection=initialSection;
   if(initialNote) state.noteId=initialNote;
+  if(initialParams.get("plan")==="1"){ state.tab="devotion"; state.devMode="plan"; }
 }catch(e){}
 
 /* ---------- user marks ---------- */
@@ -216,9 +222,151 @@ function notificationPrefs(){
   var p=jget("notificationPrefs",{});
   if(typeof p.podcast!=="boolean") p.podcast=false;
   if(typeof p.lastPodcastKey!=="string") p.lastPodcastKey="";
+  if(typeof p.pushConnected!=="boolean") p.pushConnected=false;
+  if(typeof p.pushServiceUrl!=="string") p.pushServiceUrl="";
   return p;
 }
 function saveNotificationPrefs(p){ jset("notificationPrefs",p||{}); }
+function pushServiceUrl(){
+  var p=notificationPrefs(), configured=(typeof window!=="undefined"&&window.TAW_PUSH_SERVICE_URL)?window.TAW_PUSH_SERVICE_URL:"";
+  var url=String(p.pushServiceUrl||configured||"").trim();
+  return url.replace(/\/+$/g,"");
+}
+function savePushServiceUrl(url){
+  var p=notificationPrefs(); p.pushServiceUrl=String(url||"").trim().replace(/\/+$/g,""); p.pushConnected=false; saveNotificationPrefs(p); return p.pushServiceUrl;
+}
+function pushSupported(){ return !!("serviceWorker" in navigator && "PushManager" in window && typeof Notification!=="undefined"); }
+function urlBase64ToUint8Array(base64String){
+  var padding='='.repeat((4-base64String.length%4)%4);
+  var base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  var raw=atob(base64), out=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+function pushFetch(path,opts){
+  var base=pushServiceUrl();
+  if(!base) return Promise.reject(new Error("Push service URL is not configured"));
+  opts=opts||{}; opts.headers=Object.assign({"Content-Type":"application/json"},opts.headers||{});
+  return fetch(base+path,opts).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ throw new Error(t||("Push service error "+r.status)); });
+    return r.json();
+  });
+}
+function pushConnectionLabel(){
+  var p=notificationPrefs();
+  if(!pushServiceUrl()) return "Not configured";
+  if(!pushSupported()) return "Push not supported here";
+  return p.pushConnected?"Connected for true push":"Service configured · not subscribed";
+}
+function connectPushService(){
+  if(!pushServiceUrl()) return Promise.reject(new Error("Enter the push service URL first"));
+  if(!pushSupported()) return Promise.reject(new Error("Push notifications are not supported in this browser"));
+  return ensureNotificationPermission().then(function(permission){
+    if(permission!=="granted") throw new Error("Notification permission was not granted");
+    return Promise.all([navigator.serviceWorker.ready,pushFetch("/config")]);
+  }).then(function(parts){
+    var reg=parts[0], config=parts[1];
+    if(!config.publicKey) throw new Error("The push service is missing its VAPID public key");
+    return reg.pushManager.getSubscription().then(function(sub){
+      if(sub) return sub;
+      return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(config.publicKey)});
+    });
+  }).then(function(sub){
+    var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
+    return pushFetch("/subscribe",{method:"POST",body:JSON.stringify({subscription:payload,preferences:pushReadingPreferences()})}).then(function(){ return sub; });
+  }).then(function(){
+    var p=notificationPrefs(); p.podcast=true; p.pushConnected=true; saveNotificationPrefs(p);
+    return loadLatestEpisode(true).catch(function(){}).then(function(){ return true; });
+  });
+}
+function disconnectPushService(){
+  var base=pushServiceUrl(), existing=null;
+  if(!("serviceWorker" in navigator)) return Promise.resolve(false);
+  return navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager?reg.pushManager.getSubscription():null; }).then(function(sub){
+    existing=sub;
+    if(!sub) return null;
+    var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
+    if(!base) return null;
+    return fetch(base+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:payload.endpoint})}).catch(function(){});
+  }).then(function(){ return existing?existing.unsubscribe():false; }).catch(function(){ return false; }).then(function(){
+    var p=notificationPrefs(); p.podcast=false; p.pushConnected=false; saveNotificationPrefs(p); return true;
+  });
+}
+function loadLatestEpisode(force){
+  if(!pushServiceUrl()) return Promise.reject(new Error("Push service not configured"));
+  if(!force && state.latestEpisode && Date.now()-(state.latestEpisodeFetched||0)<300000) return Promise.resolve(state.latestEpisode);
+  return pushFetch("/latest").then(function(data){
+    state.latestEpisode=data.episode||null; state.latestEpisodeFetched=Date.now();
+    if(state.tab==="podcast") render();
+    return state.latestEpisode;
+  });
+}
+function pushReadingPreferences(){
+  var s=planSettings();
+  var tz="UTC"; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"; }catch(e){}
+  return {readingReminder:{enabled:!!s.reminderEnabled,time:s.reminderTime||"07:00",startDate:s.startDate||"",timezone:tz}};
+}
+function syncPushPreferences(){
+  var prefs=notificationPrefs(); if(!prefs.pushConnected || !pushServiceUrl() || !("serviceWorker" in navigator)) return Promise.resolve(false);
+  return navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(sub){
+    if(!sub) return false;
+    var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
+    return pushFetch("/preferences",{method:"POST",body:JSON.stringify({endpoint:payload.endpoint,preferences:pushReadingPreferences()})}).then(function(){return true;});
+  }).catch(function(){ return false; });
+}
+
+function defaultPlanSettings(){
+  var y=new Date().getFullYear();
+  return {startDate:y+"-01-01",mode:"complete",reminderEnabled:false,reminderTime:"07:00",lastReminderKey:""};
+}
+function planSettings(){
+  var d=defaultPlanSettings(), s=jget("mcheynePlanSettings",{});
+  if(!s.startDate) s.startDate=d.startDate;
+  if(["complete","family","personal"].indexOf(s.mode)<0) s.mode="complete";
+  if(typeof s.reminderEnabled!=="boolean") s.reminderEnabled=false;
+  if(!/^\d{2}:\d{2}$/.test(s.reminderTime||"")) s.reminderTime="07:00";
+  if(typeof s.lastReminderKey!=="string") s.lastReminderKey="";
+  return s;
+}
+function savePlanSettings(s){ jset("mcheynePlanSettings",s); }
+function mcheyneDays(){
+  var out=[];
+  for(var m=1;m<=12;m++){
+    var month=MCHEYNE[m]||[];
+    for(var d=0;d<month.length;d++) out.push({month:m,day:d+1,readings:month[d]});
+  }
+  return out;
+}
+function dateAtNoon(str){ var p=String(str||"").split("-"); return new Date(+p[0],(+p[1]||1)-1,+p[2]||1,12,0,0,0); }
+function planDayForDate(dateStr){
+  var s=planSettings(), start=dateAtNoon(s.startDate), target=dateAtNoon(dateStr);
+  var idx=Math.round((target-start)/86400000);
+  var days=mcheyneDays();
+  if(idx<0 || idx>=days.length) return {index:idx,day:null,total:days.length};
+  return {index:idx,day:days[idx],total:days.length};
+}
+function planIndexesForMode(mode){ return mode==="family"?[0,1]:mode==="personal"?[2,3]:[0,1,2,3]; }
+function planModeLabel(mode){ return mode==="family"?"Family readings":mode==="personal"?"Personal readings":"Complete classic plan"; }
+function planProgressStats(){
+  var done=planDone(), s=planSettings(), start=dateAtNoon(s.startDate), req=planIndexesForMode(s.mode), days=mcheyneDays(), completed=0, readings=0;
+  Object.keys(done).forEach(function(date){
+    var idx=Math.round((dateAtNoon(date)-start)/86400000); if(idx<0||idx>=days.length) return;
+    var list=done[date]||[], hit=req.filter(function(i){return list.indexOf(i)>-1;}).length;
+    readings+=hit; if(hit===req.length) completed++;
+  });
+  return {days:completed,readings:readings,totalDays:days.length,totalReadings:days.length*req.length};
+}
+function checkPlanReminder(now){
+  var prefs=notificationPrefs(); if(prefs.pushConnected) return;
+  var s=planSettings(); if(!s.reminderEnabled) return;
+  now=now||new Date(); var key=dateKeyLocal(now); if(s.lastReminderKey===key) return;
+  if(now.getHours()*60+now.getMinutes()<timeMinutes(s.reminderTime)) return;
+  var info=planDayForDate(key); if(!info.day) return;
+  var req=planIndexesForMode(s.mode), done=planDone()[key]||[];
+  if(req.every(function(i){return done.indexOf(i)>-1;})){ s.lastReminderKey=key; savePlanSettings(s); return; }
+  s.lastReminderKey=key; savePlanSettings(s);
+  showAppNotification("Reading plan reminder","Today’s M’Cheyne readings are ready.",{tag:"mcheyne-"+key,url:"./?tab=devotion&plan=1",type:"plan"}).then(function(shown){ if(!shown) toast("Reading plan reminder · Today’s readings are ready"); });
+}
 function cleanReminder(r){
   if(!r || typeof r!=="object") return null;
   var out={
@@ -290,8 +438,8 @@ function prayerRequests(){
     return (b.updated||b.created||0)-(a.updated||a.created||0);
   });
 }
-function createPrayer(){
-  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:"",answered:false,category:"Personal",pinned:false,reminder:null,created:now,updated:now};
+function createPrayer(textVal,category){
+  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:String(textVal||"").trim(),answered:false,category:PRAYER_CATEGORIES.indexOf(category)>-1?category:"Personal",pinned:false,reminder:null,created:now,updated:now};
   lib.prayers.unshift(item); saveNoteLibrary(lib); return item;
 }
 function savePrayer(id,textVal){
@@ -428,6 +576,7 @@ function checkLocalReminders(){
     var key=reminderDueKey(pr.reminder,now);
     if(key) fireReminderTarget({type:"prayer",id:pr.id},pr,key);
   });
+  checkPlanReminder(now);
   checkPodcastReleaseReminder(now);
 }
 function pacificParts(d){
@@ -448,7 +597,7 @@ function podcastReleaseKey(now){
   return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());
 }
 function checkPodcastReleaseReminder(now){
-  var prefs=notificationPrefs(); if(!prefs.podcast) return;
+  var prefs=notificationPrefs(); if(!prefs.podcast || prefs.pushConnected) return;
   var key=podcastReleaseKey(now||new Date());
   if(!key||prefs.lastPodcastKey===key) return;
   prefs.lastPodcastKey=key; saveNotificationPrefs(prefs);
@@ -978,7 +1127,10 @@ function parseSpurgeon(html){
    PODCAST
    ============================================================ */
 function podcastView(){
-  var prefs=notificationPrefs();
+  var prefs=notificationPrefs(), latest=state.latestEpisode;
+  if(pushServiceUrl() && (!latest || Date.now()-(state.latestEpisodeFetched||0)>300000)) setTimeout(function(){ loadLatestEpisode(false).catch(function(){}); },0);
+  var latestHTML=latest?'<a class="latest-episode-card" href="'+esc(latest.url||SHOW_URL)+'" target="_blank" rel="noopener" data-podact="episode"><span class="content-kicker">LATEST EPISODE</span><b>'+esc(latest.name||'Latest episode')+'</b><small>'+esc(latest.release_date||'')+(latest.duration_ms?' · '+Math.round(latest.duration_ms/60000)+' MIN':'')+'</small><span class="latest-open">LISTEN ›</span></a>':'';
+  var pushLabel=prefs.pushConnected?'TRUE PUSH ON':(pushServiceUrl()?'CONNECT PUSH':'SET UP PUSH');
   return '<div class="pad podcast-page">'+
     screenHead("Podcast","Listen to the latest weekly devotional")+
     '<div class="podcast-showcase">'+
@@ -988,13 +1140,11 @@ function podcastView(){
         '<div class="podcast-title-lg">Sharpening the man through the Message.</div>'+
         '<p class="muted">Play the show right here, or jump out to Spotify and listen there.</p>'+
       '</div>'+
-    '</div>'+
-    '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" '+
-      'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
+    '</div>'+latestHTML+
+    '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
     '<a class="cta spotify-link" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
-    '<div class="podcast-alert-card"><div><span class="content-kicker">NEW EPISODE ALERTS</span><b>Monday · 6:00 AM Pacific</b><small>'+(prefs.podcast?'Release reminder enabled':'Release reminder off')+'</small></div><button class="'+(prefs.podcast?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+(prefs.podcast?'TURN OFF':'ENABLE')+'</button></div>'+
-    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div>'+
-      '<p class="muted">The Spotify player above displays the show and its newest episodes. The release alert uses the Monday 6:00 AM Pacific schedule.</p></div>'+
+    '<div class="podcast-alert-card"><div><span class="content-kicker">NEW EPISODE PUSH</span><b>Detected from Spotify</b><small>'+esc(pushConnectionLabel())+'</small></div><button class="'+(prefs.pushConnected?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+pushLabel+'</button></div>'+
+    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div><p class="muted">When the push service is connected, the backend checks Spotify for a changed episode ID and sends a notification even when the app is closed.</p></div>'+
     '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
@@ -1007,47 +1157,42 @@ function togglePlanReading(dateStr, idx){
   if(!d[k].length) delete d[k];
   jset("plandone",d);
 }
-
+function savePlanSetupFromUI(){
+  var s=planSettings(), start=$("planStartDate"), mode=$("planMode"), enabled=$("planReminderEnabled"), time=$("planReminderTime");
+  if(start&&start.value) s.startDate=start.value;
+  if(mode) s.mode=mode.value;
+  if(enabled) s.reminderEnabled=!!enabled.checked;
+  if(time&&time.value) s.reminderTime=time.value;
+  s.lastReminderKey=""; savePlanSettings(s);
+  if(s.reminderEnabled) ensureNotificationPermission().then(function(){ checkLocalReminders(); });
+  syncPushPreferences();
+}
 function plansView(){
-  var p=state.planDate.split("-");
-  var mo=+p[1], dy=+p[2];
-  var month=MCHEYNE[mo];
-  var readings=month && month[dy-1] ? month[dy-1] : null;
-  var doneList=planDone()[state.planDate]||[];
-
+  var setup=planSettings(), info=planDayForDate(state.planDate), doneList=planDone()[state.planDate]||[], req=planIndexesForMode(setup.mode), stats=planProgressStats();
   var body;
-  if(!readings){
-    body='<div class="empty"><h4>A DAY OFF THE CALENDAR</h4>'+
-      "<p>M'Cheyne's calendar runs 365 days, so February 29 has no readings of its own. "+
-      'Use today to catch up or read ahead.</p></div>';
+  if(!info.day){
+    body='<div class="empty"><h4>'+(info.index<0?'PLAN HAS NOT STARTED':'PLAN COMPLETE')+'</h4><p>'+(info.index<0?'Your selected start date is '+esc(setup.startDate)+'. Choose a date on or after your start date.':'You have reached the end of the 365-day M’Cheyne calendar. Reset or choose a new start date when you are ready to begin again.')+'</p></div>';
   } else {
+    var readings=info.day.readings;
     var mk=function(title, idxs){
-      return '<div class="stream content-card"><h4>'+title+'</h4>'+
-        idxs.map(function(i){
-          var on=doneList.indexOf(i)>-1;
-          return '<div class="rd'+(on?" done":"")+'" data-plan="'+i+'">'+
-            '<div class="tick">&#10003;</div>'+
-            '<div class="rt">'+esc(readings[i])+'</div>'+
-            '<button class="mini" data-planopen="'+esc(readings[i])+'" '+
-              'style="background:transparent;border:1px solid rgba(228,195,116,.3);color:var(--brass);'+
-              'padding:6px 9px;font-size:9px;letter-spacing:.08em">READ</button></div>';
-        }).join("")+'</div>';
+      if(!idxs.length) return '';
+      return '<div class="stream content-card"><h4>'+title+'</h4>'+idxs.map(function(i){
+        var on=doneList.indexOf(i)>-1;
+        return '<div class="rd'+(on?' done':'')+'" data-plan="'+i+'"><div class="tick">&#10003;</div><div class="rt">'+esc(readings[i])+'</div><button class="mini" data-planopen="'+esc(readings[i])+'">READ</button></div>';
+      }).join('')+'</div>';
     };
-    body=mk("FAMILY · READ ALOUD",[0,1])+mk("SECRET · ON YOUR OWN",[2,3])+
-      '<div class="motto">'+esc(MCHEYNE_MOTTOS[mo])+'</div>'+
-      '<div style="margin-top:8px;font-family:var(--util);font-size:9px;letter-spacing:.1em;'+
-        'color:rgba(183,154,120,.7)">'+doneList.length+' OF 4 DONE TODAY</div>';
+    var chunks=setup.mode==='family'?mk('FAMILY · READ ALOUD',[0,1]):setup.mode==='personal'?mk('SECRET · ON YOUR OWN',[2,3]):mk('FAMILY · READ ALOUD',[0,1])+mk('SECRET · ON YOUR OWN',[2,3]);
+    var completed=req.filter(function(i){return doneList.indexOf(i)>-1;}).length;
+    body=chunks+'<div class="motto">'+esc(MCHEYNE_MOTTOS[info.day.month])+'</div><div class="plan-day-progress">DAY '+(info.index+1)+' OF '+info.total+' · '+completed+' OF '+req.length+' READINGS DONE</div>';
   }
-
-  return '<div class="pad">'+
-    screenHead("Reading Plan","M’Cheyne one-year plan")+
-    '<div class="tabsel devotion-tabs devotion-switch" style="margin-top:10px">'+
-      '<button data-dev="today">TODAY</button>'+
-      '<button class="on" data-dev="plan">READING PLAN</button>'+
-    '</div>'+
-    '<div class="content-card helper-card square-card" style="margin-top:14px"><p class="muted">Robert Murray M’Cheyne wrote this calendar for his church in Dundee in December 1842. Four chapters a day — two to read aloud with the house, two on your own.</p></div>'+
-    '<div class="planbar"><input type="date" id="planDate" value="'+state.planDate+'"></div>'+
-    body+
+  return '<div class="pad reading-plan-page">'+
+    screenHead("Reading Plan","M’Cheyne · "+planModeLabel(setup.mode))+
+    '<div class="tabsel devotion-tabs devotion-switch"><button data-dev="today">TODAY</button><button class="on" data-dev="plan">READING PLAN</button></div>'+
+    '<div class="content-card plan-setup-card"><div class="plan-setup-head"><div><div class="content-kicker">YOUR PLAN</div><b>'+stats.days+' DAYS COMPLETED</b><small>'+stats.readings+' OF '+stats.totalReadings+' READINGS</small></div><button class="mini" data-plantoday="1">TODAY</button></div>'+
+      '<div class="plan-setup-grid"><label>START DATE<input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label>TRACK<select id="planMode"><option value="complete"'+(setup.mode==='complete'?' selected':'')+'>Complete · 4/day</option><option value="family"'+(setup.mode==='family'?' selected':'')+'>Family · 2/day</option><option value="personal"'+(setup.mode==='personal'?' selected':'')+'>Personal · 2/day</option></select></label></div>'+
+      '<div class="plan-reminder-row"><label class="toggle-row"><input type="checkbox" id="planReminderEnabled"'+(setup.reminderEnabled?' checked':'')+'><span></span><b>Reading reminder</b></label><input type="time" id="planReminderTime" value="'+esc(setup.reminderTime)+'"></div>'+
+      '<p>Changing the start date shifts Day 1 of the classic M’Cheyne calendar to your chosen date. Your saved progress remains in the backup and can be reset from Settings.</p></div>'+
+    '<div class="planbar"><label>VIEW DATE</label><input type="date" id="planDate" value="'+state.planDate+'"></div>'+body+
     '<div class="foot">PUBLIC DOMAIN · ST. PETER’S, DUNDEE, 1842</div></div>';
 }
 
@@ -1380,9 +1525,10 @@ function prayerNotesView(sec){
       '<textarea class="prayer-text" data-prayertext="'+r.id+'" placeholder="What do you want to pray for?">'+esc(r.text||'')+'</textarea>'+ 
       (r.answered?'<div class="prayer-status">✓ ANSWERED</div>':'')+'</div>';
   }).join(''):emptyBox('NO PRAYER REQUESTS YET','Add a request. Each request can be as long as you need, categorized, pinned, and given a recurring reminder.');
+  var composer=state.prayerComposer?'<div class="prayer-composer"><div class="content-kicker">NEW PRAYER REQUEST</div><textarea id="prayerDraft" placeholder="What do you want to pray for?">'+esc(state.prayerDraft||'')+'</textarea><div class="prayer-composer-row"><select id="prayerDraftCategory">'+PRAYER_CATEGORIES.map(function(c){return '<option value="'+esc(c)+'"'+(state.prayerDraftCategory===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select><button class="secondary-btn" data-prayercancel="1">CANCEL</button><button class="primary-btn" data-prayersave="1">SAVE REQUEST</button></div></div>':'';
   return '<div class="pad notes-page prayer-page">'+screenHead('Prayer Requests','What do you want to pray for?')+
     notesTabsHTML()+
-    '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>Organize requests, set recurring reminders, and keep today’s prayer focus in one place.</p></div><button class="primary-mini" data-prayernew="1">+ ADD REQUEST</button></div>'+ 
+    '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>Organize requests, set recurring reminders, and keep today’s prayer focus in one place.</p></div><button class="primary-mini" data-prayernew="1">+ ADD REQUEST</button></div>'+composer+
     prayerTodayFeed()+
     '<div class="prayer-list">'+rows+'</div>'+ 
     '<div class="foot">NO CHARACTER LIMIT · REMINDERS · CATEGORIES · INCLUDED IN BACKUPS</div></div>';
@@ -1668,12 +1814,14 @@ function settingsView(){
     '<div class="settings-legal">ASV and YLT are public domain. The KJV is public domain in the United States; special Crown rights can apply to publication in the United Kingdom.</div>'+
     '<div class="grouphd settings-section-head">NOTIFICATIONS</div>'+
     '<div class="setrow"><div><div class="lbl">App notifications</div><div class="sub">'+(notificationStatus()==="granted"?"Enabled":notificationStatus()==="denied"?"Blocked in browser settings":notificationStatus()==="unsupported"?"Not supported on this browser":"Permission not granted")+'</div></div><button class="mini" data-notifyenable="1">ENABLE</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Podcast release reminder</div><div class="sub">Monday at 6:00 AM Pacific · '+(nprefs.podcast?"enabled":"off")+'</div></div><button class="mini" data-podcastnotify="1">'+(nprefs.podcast?"TURN OFF":"TURN ON")+'</button></div>'+
-    '<div class="settings-legal">Local reminders are checked while the app is running and whenever it opens. True push while the app is fully closed requires a separate web-push service.</div>'+
+    '<div class="setrow push-service-row"><div><div class="lbl">Podcast push service</div><div class="sub">'+esc(pushConnectionLabel())+'</div><input id="pushServiceUrl" class="settings-inline-input" type="url" placeholder="https://your-worker.workers.dev" value="'+esc(pushServiceUrl())+'"></div><div class="settings-stack-actions"><button class="mini" data-pushurlsave="1">SAVE URL</button><button class="mini" data-podcastnotify="1">'+(nprefs.pushConnected?"DISCONNECT":"CONNECT")+'</button></div></div>'+
+    '<div class="settings-legal">The included Cloudflare Worker checks Spotify on a schedule. Once connected, a changed episode ID triggers true Web Push even while the installed app is closed.</div>'+
+    '<div class="grouphd settings-section-head">READING PLAN</div>'+
+    '<div class="setrow"><div><div class="lbl">M’Cheyne progress</div><div class="sub">'+planProgressStats().days+' days completed · starts '+esc(planSettings().startDate)+' · '+esc(planModeLabel(planSettings().mode))+'</div></div><button class="mini danger" data-planreset="1">RESET PLAN</button></div>'+
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
     '<div class="setrow"><div><div class="lbl">Highlights &amp; saved Scripture</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' chapter bookmarks · '+vbCount+' verse bookmarks · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Notes library</div><div class="sub">'+nstats.docs+' saved notes · '+nstats.prayers+' prayer requests · '+nstats.chars.toLocaleString()+' characters</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, categories, bookmarks, highlights, reading-plan progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, Scripture categories, bookmarks, highlights, M’Cheyne setup and progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
     '<div class="setrow"><div><div class="lbl">Activity history</div><div class="sub">'+activity().length+' recent actions saved on this device.</div></div><button class="mini" data-clearhistory="1">CLEAR</button></div>'+
     '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, bookmarks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
     '<div class="foot">BIBLE TEXT DOWNLOADS AND YOUR READING DATA STAY ON THIS DEVICE</div></div>';
@@ -1725,11 +1873,12 @@ function backAvailable(){
   if(state.tab==="settings" || state.tab==="card") return true;
   if(state.tab==="devotion" && state.devMode==="plan") return true;
   if(state.tab==="bible" && (state.bview!=="read" || state.categoryOpen)) return true;
-  if(state.tab==="notes" && state.noteId) return true;
+  if(state.tab==="notes" && (state.noteId || state.prayerComposer)) return true;
   return false;
 }
 function appBack(){
   if(state.reminderTarget){ state.reminderTarget=null; render(); return; }
+  if(state.tab==="notes" && state.prayerComposer){ state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); return; }
   if(state.tab==="notes" && state.noteId){ saveOpenNote(); state.noteId=null; state.notePreview=false; render(); return; }
   if(state.tab==="bible" && state.categoryOpen){ state.categoryOpen=null; state.bview="categories"; render(); return; }
   if(state.tab==="bible" && state.bview!=="read"){ state.bview="read"; state.sel=null; render(); return; }
@@ -1809,6 +1958,9 @@ function wire(scr){
 
   var pd=$("planDate");
   if(pd) pd.onchange=function(){ state.planDate=pd.value; render(); };
+  var planStart=$("planStartDate"), planMode=$("planMode"), planReminderEnabled=$("planReminderEnabled"), planReminderTime=$("planReminderTime");
+  [planStart,planMode,planReminderEnabled,planReminderTime].forEach(function(el){ if(el) el.onchange=function(){ savePlanSetupFromUI(); render(); }; });
+  on(scr,"[data-plantoday]",function(b){ b.onclick=function(){ state.planDate=stampOf(new Date()); render(); }; });
   on(scr,"[data-plan]",function(b){
     b.onclick=function(e){
       if(e.target.closest("[data-planopen]")) return;
@@ -1914,7 +2066,7 @@ function wire(scr){
     b.onclick=function(){ state.historyTab=b.dataset.history; render(); };
   });
   on(scr,"[data-notesection]",function(b){
-    b.onclick=function(){ saveOpenNote(); state.noteSection=b.dataset.notesection; state.noteId=null; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
+    b.onclick=function(){ saveOpenNote(); state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; state.noteSection=b.dataset.notesection; state.noteId=null; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
   });
   on(scr,"[data-notenew]",function(b){
     b.onclick=function(){ var doc=createDoc(b.dataset.notenew); state.noteSection=b.dataset.notenew; state.noteId=doc.id; state.notePreview=false; render(); setTimeout(function(){var t=$("noteTitle");if(t)t.focus();},20); };
@@ -1930,7 +2082,11 @@ function wire(scr){
   });
   on(scr,"[data-md]",function(b){ b.onclick=function(){ applyMarkdownAction(b.dataset.md); }; });
   on(scr,"[data-notepreview]",function(b){ b.onclick=function(){ saveOpenNote(); state.notePreview=!state.notePreview; render(); }; });
-  on(scr,"[data-prayernew]",function(b){ b.onclick=function(){ var item=createPrayer(); render(); setTimeout(function(){var t=document.querySelector('[data-prayertext="'+item.id+'"]');if(t)t.focus();},20); }; });
+  on(scr,"[data-prayernew]",function(b){ b.onclick=function(){ state.prayerComposer=true; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); setTimeout(function(){var t=$("prayerDraft");if(t)t.focus();},20); }; });
+  var prayerDraft=$("prayerDraft"); if(prayerDraft) prayerDraft.oninput=function(){ state.prayerDraft=prayerDraft.value; };
+  var prayerDraftCategory=$("prayerDraftCategory"); if(prayerDraftCategory) prayerDraftCategory.onchange=function(){ state.prayerDraftCategory=prayerDraftCategory.value; };
+  on(scr,"[data-prayercancel]",function(b){ b.onclick=function(){ state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; render(); }; });
+  on(scr,"[data-prayersave]",function(b){ b.onclick=function(){ var val=$("prayerDraft")?$("prayerDraft").value.trim():state.prayerDraft.trim(); if(!val){ toast("Add a prayer request first"); return; } var cat=$("prayerDraftCategory")?$("prayerDraftCategory").value:state.prayerDraftCategory; createPrayer(val,cat); state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; toast("Prayer request saved"); render(); }; });
   on(scr,"[data-prayertoggle]",function(b){ b.onclick=function(){ togglePrayer(b.dataset.prayertoggle); render(); }; });
   on(scr,"[data-prayerdelete]",function(b){
     b.onclick=function(){ if(b.dataset.armed){ deletePrayer(b.dataset.prayerdelete); render(); } else { b.dataset.armed="1"; b.textContent="?"; } };
@@ -1956,14 +2112,13 @@ function wire(scr){
   });
   var reminderFreq=$("reminderFreq");
   if(reminderFreq){ reminderFreq.onchange=updateReminderFormVisibility; updateReminderFormVisibility(); }
+  on(scr,"[data-pushurlsave]",function(b){ b.onclick=function(){ var inp=$("pushServiceUrl"); if(!inp||!inp.value.trim()){ toast("Enter your deployed push service URL"); return; } savePushServiceUrl(inp.value); toast("Push service URL saved"); render(); }; });
   on(scr,"[data-podcastnotify]",function(b){
     b.onclick=function(){
       var prefs=notificationPrefs();
-      if(prefs.podcast){ prefs.podcast=false; saveNotificationPrefs(prefs); toast("Podcast release reminder off"); render(); return; }
-      ensureNotificationPermission().then(function(status){
-        prefs=notificationPrefs(); prefs.podcast=true; saveNotificationPrefs(prefs);
-        toast(status==="granted"?"Podcast release reminder enabled":"Release reminder enabled in the app"); render(); checkLocalReminders();
-      });
+      if(prefs.pushConnected){ disconnectPushService().then(function(){ toast("Podcast push disconnected"); render(); }); return; }
+      if(!pushServiceUrl()){ state.returnTab=state.tab; state.tab="settings"; toast("Add the push service URL in Settings"); render(); return; }
+      connectPushService().then(function(){ toast("True new-episode push connected"); render(); }).catch(function(err){ toast(err.message||"Could not connect push"); render(); });
     };
   });
   on(scr,"[data-clearhistory]",function(b){
@@ -2060,9 +2215,15 @@ function wire(scr){
       });
     };
   });
+  on(scr,"[data-planreset]",function(b){
+    b.onclick=function(){
+      if(b.dataset.armed){ jset("plandone",{}); jset("mcheynePlanSettings",defaultPlanSettings()); state.planDate=stampOf(new Date()); syncPushPreferences(); toast("Reading plan reset"); render(); }
+      else { b.dataset.armed="1"; b.textContent="RESET?"; }
+    };
+  });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
+      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), mcheynePlanSettings:planSettings(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -2075,11 +2236,12 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:""});
-        ls("streak","0"); ls("lastWalk","");
-        Promise.all(TIERS.filter(function(t){return t.available;})
-          .map(function(t){ return removeTier(t.id); }))
-          .then(function(){ state.meta={}; state.loaded={}; state.tab="devotion"; toast("Everything cleared"); render(); });
+        var disconnectPromise=notificationPrefs().pushConnected?disconnectPushService():Promise.resolve(false);
+        disconnectPromise.catch(function(){}).then(function(){
+          jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("mcheynePlanSettings",defaultPlanSettings()); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:"",pushConnected:false,pushServiceUrl:""});
+          ls("streak","0"); ls("lastWalk","");
+          return Promise.all(TIERS.filter(function(t){return t.available;}).map(function(t){ return removeTier(t.id); }));
+        }).then(function(){ state.meta={}; state.loaded={}; state.tab="devotion"; toast("Everything cleared"); render(); });
       } else {
         b.dataset.armed="1"; b.textContent="TAP AGAIN TO CONFIRM";
       }
@@ -2348,7 +2510,7 @@ if(window.matchMedia){
     state.tab=b.dataset.tab;
     state.returnTab=state.tab;
     if(state.tab==="bible") state.bview="read";
-    if(state.tab!=="notes"){ state.noteId=null; state.notePreview=false; }
+    if(state.tab!=="notes"){ state.noteId=null; state.notePreview=false; state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; }
     if(state.tab==="podcast") logActivity("podcast","The Applied Word Podcast","Podcast tab");
     render();
   };
@@ -2376,6 +2538,7 @@ refreshMeta()
   .then(function(){ render(); });
 
 render();
+if(pushServiceUrl()) setTimeout(function(){ loadLatestEpisode(false).catch(function(){}); },2200);
 
 setTimeout(checkLocalReminders,1800);
 setInterval(checkLocalReminders,60000);

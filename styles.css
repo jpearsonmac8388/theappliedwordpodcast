@@ -1235,3 +1235,108 @@ nav button span{font-size:6.7px;line-height:1}
   .prayer-card-head>div{gap:3px}.prayer-card-head .icon-text-btn{font-size:5.8px;padding-left:6px;padding-right:6px}
   .podcast-alert-card{align-items:flex-start;flex-direction:column}.podcast-alert-card button{width:100%}
 }
+
+/* ============================================================
+   v24 — push service, custom M'Cheyne plan, stable action bars
+   ============================================================ */
+
+/* Consistent interior spacing across card-like surfaces. */
+.settings-page .setrow,
+.settings-page .settings-legal,
+.settings-page .modern-tier,
+.helper-card,
+.stream,
+.empty,
+.notes-shell,
+.today-prayer-card,
+.podcast-alert-card,
+.library-card,
+.category-panel,
+.reminder-panel{
+  padding:14px!important;
+}
+.settings-page .setrow{margin-top:9px;gap:12px;align-items:center}
+.settings-page .setrow>div:first-child{min-width:0;padding:1px 0}
+.settings-page .setrow .lbl{line-height:1.25}
+.settings-page .setrow .sub{margin-top:5px;line-height:1.5}
+.settings-stack-actions{display:flex;flex-direction:column;gap:7px;flex:0 0 auto}
+.settings-inline-input{
+  width:100%;height:42px;margin-top:9px;padding:0 11px;border:1px solid var(--line);
+  border-radius:var(--radius-control);background:color-mix(in srgb,var(--forge) 24%,var(--ground));
+  color:var(--bone);font-family:var(--slab);font-size:16px!important
+}
+
+/* Smaller app chrome: remove unused vertical air without sacrificing tap targets. */
+.app-header{min-height:62px;padding:calc(5px + env(safe-area-inset-top)) 13px 5px}
+.app-header .header-back,.app-header .icon-btn{width:34px;height:34px}
+nav{min-height:54px!important;padding-top:2px}
+nav button{padding:4px 1px 5px!important;gap:1px!important}
+nav button i{width:25px!important;height:22px!important}
+nav button i svg{width:19px!important;height:19px!important}
+nav button span{font-size:6.3px!important;line-height:1!important}
+
+/* Note save controls stay inside the scrollable app area and above bottom nav. */
+.note-editor-page{padding-bottom:90px}
+.note-editor-actions{
+  position:sticky;bottom:8px;z-index:16;margin-top:10px;padding:7px;
+  border:1px solid var(--line);border-radius:13px;
+  background:color-mix(in srgb,var(--ground) 94%,transparent);
+  box-shadow:0 12px 28px rgba(0,0,0,.26);backdrop-filter:blur(16px)
+}
+.note-editor-actions .primary-btn,.note-editor-actions .secondary-btn{min-height:38px}
+
+/* Podcast episode detection. */
+.latest-episode-card{
+  position:relative;display:block;margin:10px 0;padding:13px 52px 13px 14px;
+  border:1px solid var(--line);border-radius:var(--radius-card);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--brass) 8%,var(--surface)),var(--surface-2));
+  color:var(--bone);text-decoration:none;box-shadow:0 7px 20px rgba(0,0,0,.08)
+}
+.latest-episode-card b{display:block;margin-top:5px;font-family:var(--slab);font-size:14px;line-height:1.3}
+.latest-episode-card small{display:block;margin-top:6px;font-family:var(--util);font-size:6.7px;letter-spacing:.06em;color:var(--ash)}
+.latest-open{position:absolute;right:13px;top:50%;transform:translateY(-50%);font-family:var(--util);font-size:7px;font-weight:700;color:var(--brass)}
+
+/* User-configurable M'Cheyne plan. */
+.plan-setup-card{margin-top:12px;padding:14px!important;overflow:visible}
+.plan-setup-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.plan-setup-head b{display:block;margin-top:5px;font-family:var(--slab);font-size:13px;color:var(--bone)}
+.plan-setup-head small{display:block;margin-top:3px;font-family:var(--util);font-size:6.5px;letter-spacing:.06em;color:var(--ash)}
+.plan-setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}
+.plan-setup-grid label,.planbar label{display:flex;flex-direction:column;gap:5px;font-family:var(--util);font-size:6.5px;letter-spacing:.07em;color:var(--ash)}
+.plan-setup-grid input,.plan-setup-grid select,.plan-reminder-row input[type="time"]{
+  width:100%;height:42px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius-control);
+  background:var(--surface);color:var(--bone);font-family:var(--slab);font-size:16px!important
+}
+.plan-reminder-row{display:grid;grid-template-columns:1fr 132px;gap:10px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.toggle-row{display:flex;align-items:center;gap:9px;color:var(--bone);font-family:var(--slab);font-size:11px;cursor:pointer}
+.toggle-row input{position:absolute;opacity:0;pointer-events:none}
+.toggle-row span{width:36px;height:21px;border-radius:999px;background:color-mix(in srgb,var(--ash) 28%,transparent);border:1px solid var(--line);position:relative;transition:.15s}
+.toggle-row span::after{content:"";position:absolute;width:15px;height:15px;left:2px;top:2px;border-radius:50%;background:var(--bone);transition:.15s}
+.toggle-row input:checked+span{background:color-mix(in srgb,var(--brass) 65%,transparent)}
+.toggle-row input:checked+span::after{transform:translateX(15px);background:var(--forge)}
+.plan-setup-card>p{margin-top:10px;font-family:var(--slab);font-size:10.5px;line-height:1.5;color:var(--ash)}
+.reading-plan-page .planbar{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface)}
+.reading-plan-page .planbar input{width:100%;height:40px;margin-top:5px;padding:0 8px;border:0;background:transparent;color:var(--bone)}
+.plan-day-progress{margin-top:10px;font-family:var(--util);font-size:7px;letter-spacing:.08em;color:var(--brass)}
+.reading-plan-page .stream .mini{padding:7px 9px}
+
+/* Prayer composer is a clean transient entry surface; it clears after save/cancel. */
+.prayer-composer{
+  margin:4px 0 12px;padding:13px;border:1px solid var(--line-strong);border-radius:var(--radius-card);
+  background:linear-gradient(150deg,var(--surface),var(--surface-2));box-shadow:0 8px 22px rgba(0,0,0,.10)
+}
+.prayer-composer textarea{
+  width:100%;min-height:112px;margin-top:9px;padding:12px;border:1px solid var(--line);border-radius:var(--radius-control);
+  background:color-mix(in srgb,var(--forge) 24%,var(--ground));color:var(--bone);font-family:var(--slab);font-size:16px!important;line-height:1.55;resize:vertical
+}
+.prayer-composer-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center;margin-top:8px}
+.prayer-composer-row select{min-width:0;height:40px;padding:0 9px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);color:var(--bone);font-size:16px!important}
+.prayer-composer-row .primary-btn,.prayer-composer-row .secondary-btn{min-height:40px;padding:9px 10px}
+
+@media (max-width:390px){
+  .plan-setup-grid{grid-template-columns:1fr}
+  .plan-reminder-row{grid-template-columns:1fr 112px}
+  .prayer-composer-row{grid-template-columns:1fr 1fr}
+  .prayer-composer-row select{grid-column:1/-1}
+  .settings-stack-actions{gap:5px}
+}

@@ -1,0 +1,17 @@
+name = "the-applied-word-push"
+main = "src/index.js"
+compatibility_date = "2026-08-14"
+workers_dev = true
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+SPOTIFY_SHOW_ID = "75QaXUSGooCOG8oqKhuNmG"
+VAPID_SUBJECT = "mailto:replace-with-your-email@example.com"
+# Optional. Set to your GitHub Pages origin, e.g. https://username.github.io
+APP_ORIGIN = ""

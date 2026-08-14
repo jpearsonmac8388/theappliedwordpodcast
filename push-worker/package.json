@@ -1,0 +1,16 @@
+{
+  "name": "taw-podcast-push-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "generate-vapid": "node scripts/generate-vapid.mjs"
+  },
+  "dependencies": {
+    "web-push-neo": "latest"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
