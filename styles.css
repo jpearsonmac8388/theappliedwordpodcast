@@ -790,3 +790,15 @@ body[data-theme="midnight"] nav{background:linear-gradient(180deg,rgba(17,26,42,
 body[data-theme="slate"] .theme-card, body[data-theme="slate"] .quick-card, body[data-theme="slate"] .feature-card, body[data-theme="slate"] .content-card, body[data-theme="slate"] .reader-shell, body[data-theme="slate"] .podcast-showcase, body[data-theme="slate"] .helper-card, body[data-theme="slate"] .modern-walk{background:linear-gradient(155deg,rgba(38,49,61,.95),rgba(26,35,46,.96));}
 body[data-theme="slate"] .reader-search-btn, body[data-theme="slate"] .readbar button{background:rgba(44,58,72,.82)}
 body[data-theme="slate"] nav{background:linear-gradient(180deg,rgba(30,40,50,.98),rgba(24,33,41,.98))}
+
+
+/* v15 polish: devotion hero scaling + refined card preview */
+.feature-media{height:168px}
+.hero-rotator{display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(37,28,22,.98),rgba(27,21,17,.98));}
+.hero-rotator img{width:100%;height:100%;object-fit:contain;object-position:center center;transform:none;padding:8px 10px 0}
+.hero-rotator img.swap{opacity:.94;animation:heroSwap .55s ease 1}
+.hero-overlay{background:linear-gradient(180deg,rgba(12,10,9,.04),rgba(12,10,9,.08) 48%,rgba(12,10,9,.32) 100%)}
+.cardprev.light-stage{padding:18px;background:linear-gradient(155deg,rgba(62,47,35,.95),rgba(35,26,20,.96));}
+.cardprev canvas{max-height:500px}
+body[data-theme="midnight"] .hero-rotator{background:linear-gradient(180deg,rgba(15,26,42,.98),rgba(12,19,31,.98));}
+body[data-theme="slate"] .hero-rotator{background:linear-gradient(180deg,rgba(28,39,49,.98),rgba(20,30,38,.98));}

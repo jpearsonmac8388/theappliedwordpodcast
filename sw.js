@@ -1,11 +1,11 @@
 /* The Applied Word Podcast — app shell cache */
-var CACHE = "applied-word-v14";
+var CACHE = "applied-word-v15";
 var SHELL = [
   "./", "./index.html", "./styles.css", "./content.js", "./mcheyne.js",
   "./bible.js", "./app.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png", "./icons/favicon.png",
-  "./assets/podcast-cover.png", "./assets/verse-card-logo.jpg",
+  "./assets/podcast-cover.png", "./assets/verse-card-logo-round.png", "./assets/verse-card-logo.jpg",
   "./assets/devotion-hero-1.png", "./assets/devotion-hero-2.png", "./assets/devotion-hero-3.png",
   "./assets/devotion-hero-4.png", "./assets/devotion-hero-5.png", "./assets/devotion-hero-6.png",
   "./assets/devotion-hero-7.png", "./assets/devotion-hero-8.png", "./assets/devotion-hero-9.png",

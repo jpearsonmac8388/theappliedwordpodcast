@@ -12,7 +12,7 @@ var THEMES = [
 var HERO_IMAGES = [1,2,3,4,5,6,7,8,9,10].map(function(n){ return "assets/devotion-hero-"+n+".png"; });
 var heroTimer = null;
 var cardLogo = new Image();
-cardLogo.src = "assets/verse-card-logo.jpg";
+cardLogo.src = "assets/verse-card-logo-round.png";
 cardLogo.onload = function(){ if(state.tab==="card") drawCard(); };
 
 /* ---------- small helpers ---------- */
@@ -902,7 +902,7 @@ function drawCard(){
     return n-Math.floor(n);
   }
   function wrappedLines(text,maxW,size,weight,style){
-    x.font=(style||"")+" "+(weight||"400")+" "+size+"px 'Lora', Georgia, serif";
+    x.font=(style||"")+" "+(weight||"400")+" "+size+"px 'Cinzel', 'Roboto Slab', Georgia, serif";
     var words=String(text).trim().split(/\s+/), lines=[], line="";
     words.forEach(function(word){
       var trial=line ? line+" "+word : word;
@@ -913,29 +913,29 @@ function drawCard(){
     return lines;
   }
 
-  x.fillStyle="#f2e6d2"; x.fillRect(0,0,W,H);
+  x.fillStyle="#f3e8d7"; x.fillRect(0,0,W,H);
   var paper=x.createLinearGradient(0,0,0,H);
-  paper.addColorStop(0,"rgba(255,250,242,.78)");
-  paper.addColorStop(.2,"rgba(241,229,205,.52)");
-  paper.addColorStop(.6,"rgba(228,213,182,.22)");
-  paper.addColorStop(1,"rgba(210,190,154,.34)");
+  paper.addColorStop(0,"rgba(255,251,244,.82)");
+  paper.addColorStop(.22,"rgba(243,232,211,.56)");
+  paper.addColorStop(.65,"rgba(229,213,181,.24)");
+  paper.addColorStop(1,"rgba(213,192,156,.34)");
   x.fillStyle=paper; x.fillRect(0,0,W,H);
-  for(var i=0;i<1900;i++){
+  for(var i=0;i<2100;i++){
     var rx=seeded(i*3)*W, ry=seeded(i*3+1)*H;
-    var alpha=.010+seeded(i*3+2)*.014;
+    var alpha=.010+seeded(i*3+2)*.013;
     x.fillStyle=(i%2?"rgba(255,255,255,":"rgba(145,116,72,")+alpha+")";
-    x.fillRect(rx,ry,1+seeded(i+50)*2.5,1+seeded(i+80)*1.5);
+    x.fillRect(rx,ry,1+seeded(i+50)*2.4,1+seeded(i+80)*1.4);
   }
-  var vign=x.createRadialGradient(W*.5,H*.42,0,W*.5,H*.42,Math.max(W,H)*.8);
-  vign.addColorStop(0,"rgba(255,255,255,.12)");
-  vign.addColorStop(.7,"rgba(196,166,106,.08)");
-  vign.addColorStop(1,"rgba(0,0,0,.04)");
+  var vign=x.createRadialGradient(W*.5,H*.42,0,W*.5,H*.42,Math.max(W,H)*.82);
+  vign.addColorStop(0,"rgba(255,255,255,.10)");
+  vign.addColorStop(.72,"rgba(196,166,106,.07)");
+  vign.addColorStop(1,"rgba(0,0,0,.045)");
   x.fillStyle=vign; x.fillRect(0,0,W,H);
 
-  var gold="#af8238", goldDeep="#6e4d1b", ink="#352618";
-  var outer=W*.05, inner=W*.068;
+  var gold="#ae8137", goldDeep="#6d4d1d", ink="#2f2115";
+  var outer=W*.058, inner=W*.075;
   roundedRect(outer,outer,W-outer*2,H-outer*2,W*.02);
-  x.strokeStyle="rgba(175,130,56,.58)"; x.lineWidth=Math.max(2,W*.0026); x.stroke();
+  x.strokeStyle="rgba(174,129,55,.58)"; x.lineWidth=Math.max(2,W*.0026); x.stroke();
   roundedRect(inner,inner,W-inner*2,H-inner*2,W*.016);
   x.strokeStyle="rgba(197,159,91,.72)"; x.lineWidth=Math.max(1.6,W*.0018); x.stroke();
   function corner(x0,y0,flipX,flipY){
@@ -943,47 +943,52 @@ function drawCard(){
     x.beginPath(); x.moveTo(0,28); x.quadraticCurveTo(0,0,28,0); x.moveTo(8,28); x.quadraticCurveTo(8,8,28,8); x.stroke();
     x.restore();
   }
-  corner(outer+12,outer+12,1,1); corner(W-outer-12,outer+12,-1,1); corner(outer+12,H-outer-12,1,-1); corner(W-outer-12,H-outer-12,-1,-1);
+  corner(outer+14,outer+14,1,1); corner(W-outer-14,outer+14,-1,1); corner(outer+14,H-outer-14,1,-1); corner(W-outer-14,H-outer-14,-1,-1);
 
   x.textAlign="center"; x.textBaseline="middle";
   x.fillStyle=gold;
-  x.font="700 "+Math.round(W*.021)+"px 'JetBrains Mono', monospace";
-  x.fillText("THE APPLIED WORD PODCAST",W/2,H*(shortCard?.068:.062));
-  var logoW=W*(shortCard?.26:.28), logoH=logoW;
-  var logoY=H*(shortCard?.15:.14);
+  x.font="700 "+Math.round(W*.0195)+"px 'JetBrains Mono', monospace";
+  x.fillText("THE APPLIED WORD PODCAST",W/2,H*(shortCard?.067:.061));
+
+  var logoW=W*(shortCard?.22:.24), logoH=logoW;
+  var logoY=H*(shortCard?.155:.145);
   if(cardLogo.complete && cardLogo.naturalWidth){
     x.save();
-    x.shadowColor='rgba(0,0,0,.14)'; x.shadowBlur=W*.014; x.shadowOffsetY=W*.005;
+    // unify the round logo with a soft gold halo and subtle shadow
+    x.beginPath(); x.arc(W/2, logoY, logoW*.53, 0, Math.PI*2); x.closePath();
+    x.fillStyle='rgba(227,204,149,.28)'; x.fill();
+    x.strokeStyle='rgba(175,129,55,.32)'; x.lineWidth=Math.max(4,W*.004); x.stroke();
+    x.shadowColor='rgba(0,0,0,.16)'; x.shadowBlur=W*.015; x.shadowOffsetY=W*.005;
     x.drawImage(cardLogo, W/2-logoW/2, logoY-logoH/2, logoW, logoH);
     x.restore();
   }
 
-  var pad=W*.115, maxW=W-pad*2;
-  var size=Math.round(W*(shortCard?.061:.066));
-  var maxBlock=H*(shortCard?.38:.34), lines=wrappedLines(cv.text,maxW,size,"700","");
-  while(lines.length*size*1.26>maxBlock && size>Math.round(W*.036)){
-    size-=Math.max(2,Math.round(W*.0025));
-    lines=wrappedLines(cv.text,maxW,size,"700","");
+  var pad=W*(shortCard?.145:.148), maxW=W-pad*2;
+  var size=Math.round(W*(shortCard?.053:.056));
+  var maxBlock=H*(shortCard?.31:.28), lines=wrappedLines(cv.text,maxW,size,'800','');
+  while((lines.length*size*1.22>maxBlock || lines.some(function(ln){ x.font='800 '+size+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; return x.measureText(ln).width>maxW; })) && size>Math.round(W*.033)){
+    size-=Math.max(2,Math.round(W*.0022));
+    lines=wrappedLines(cv.text,maxW,size,'800','');
   }
-  var lineH=size*1.26, blockH=lines.length*lineH;
-  var verseCenter=H*(shortCard?.55:.51);
-  var startY=verseCenter-blockH/2+lineH*.48;
-  x.font="700 "+size+"px 'Roboto Slab', Georgia, serif";
+  var lineH=size*1.22, blockH=lines.length*lineH;
+  var verseCenter=H*(shortCard?.525:.50);
+  var startY=verseCenter-blockH/2+lineH*.46;
+  x.font="800 "+size+"px 'Cinzel', 'Roboto Slab', Georgia, serif";
   x.fillStyle=ink;
-  x.shadowColor="rgba(255,255,255,.28)"; x.shadowBlur=W*.004; x.shadowOffsetY=0;
+  x.shadowColor="rgba(255,255,255,.22)"; x.shadowBlur=W*.0038; x.shadowOffsetY=0;
   for(var k=0;k<lines.length;k++) x.fillText(lines[k],W/2,startY+k*lineH);
   x.shadowColor="transparent"; x.shadowBlur=0;
 
-  var refY=Math.min(H*(shortCard?.79:.76), startY+blockH+W*.075);
+  var refY=Math.min(H*(shortCard?.765:.72), startY+blockH+W*.078);
   x.strokeStyle="rgba(182,136,64,.72)"; x.lineWidth=Math.max(2,W*.0021);
-  x.beginPath(); x.moveTo(W*.29,refY-W*.036); x.lineTo(W*.71,refY-W*.036); x.stroke();
+  x.beginPath(); x.moveTo(W*.31,refY-W*.038); x.lineTo(W*.69,refY-W*.038); x.stroke();
   x.fillStyle=goldDeep;
-  x.font="700 "+Math.round(W*.03)+"px 'JetBrains Mono', monospace";
+  x.font="700 "+Math.round(W*.029)+"px 'JetBrains Mono', monospace";
   x.fillText(cv.ref.toUpperCase(),W/2,refY);
 
   x.fillStyle="rgba(123,90,36,.9)";
-  x.font="italic "+Math.round(W*.024)+"px 'Lora', Georgia, serif";
-  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.895:.875));
+  x.font="italic "+Math.round(W*.0225)+"px 'Lora', Georgia, serif";
+  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.885:.852));
 }
 
 function saveCard(){
