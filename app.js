@@ -248,12 +248,17 @@ function pushReadingPreferences(){
 function syncPushPreferences(){ return Promise.resolve(false); }
 
 function defaultPlanSettings(){
-  var y=new Date().getFullYear();
-  return {startDate:y+"-01-01",duration:"year",reminderEnabled:false,reminderTime:"07:00",lastReminderKey:""};
+  return {startDate:stampOf(new Date()),duration:"year",reminderEnabled:false,reminderTime:"07:00",lastReminderKey:""};
 }
 function planSettings(){
   var d=defaultPlanSettings(), s=jget("mcheynePlanSettings",{});
   if(!s.startDate) s.startDate=d.startDate;
+  var legacyJan1=new Date().getFullYear()+"-01-01";
+  if(!ls("planDefaultMigratedV29") && s.startDate===legacyJan1 && Object.keys(planDone()).length===0){
+    s.startDate=d.startDate;
+    jset("mcheynePlanSettings",s);
+    ls("planDefaultMigratedV29","1");
+  }
   // v24 used complete/family/personal. Migrate those cleanly to the standard 1-year plan.
   if(!s.duration){ s.duration=(s.mode&&s.mode!=="complete")?"year":"year"; }
   if(["year","sixmonth"].indexOf(s.duration)<0) s.duration="year";
@@ -1108,8 +1113,8 @@ function plansView(){
   return '<div class="pad reading-plan-page">'+
     screenHead("Reading Plan","M’Cheyne · "+planDurationLabel(setup.duration))+
     '<div class="tabsel devotion-tabs devotion-switch"><button data-dev="today">TODAY</button><button class="on" data-dev="plan">READING PLAN</button></div>'+
-    '<div class="content-card plan-setup-card"><div class="plan-setup-head"><div><div class="content-kicker">YOUR PLAN</div><b>'+stats.days+' DAYS COMPLETED</b><small>'+stats.readings+' OF '+stats.totalReadings+' READINGS</small></div><button class="mini" data-plantoday="1">TODAY</button></div>'+
-      '<div class="plan-setup-grid"><label>START DATE<input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label>PLAN<select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Months</option></select></label></div>'+
+    '<div class="content-card plan-setup-card"><div class="plan-setup-head"><div><div class="content-kicker">YOUR PLAN</div><b>'+stats.days+' DAYS COMPLETED</b><small>'+stats.readings+' OF '+stats.totalReadings+' READINGS</small></div></div>'+
+      '<div class="plan-setup-grid"><label><span>START DATE</span><input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label><span>PLAN</span><select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year · 4/day</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Months · 8/day</option></select></label></div>'+
       '<div class="plan-reminder-row"><label class="toggle-row"><input type="checkbox" id="planReminderEnabled"'+(setup.reminderEnabled?' checked':'')+'><span></span><b>Reading reminder</b></label><label class="plan-reminder-time-label">TIME<input type="time" id="planReminderTime" value="'+esc(setup.reminderTime)+'"></label></div>'+
       '<p>The 1 Year plan follows one M’Cheyne calendar day each day. The 6 Month plan combines two consecutive M’Cheyne days so the same reading schedule is completed in about half the time.</p></div>'+
     '<div class="plan-date-nav"><button class="mini" data-plandate="-1" aria-label="Previous reading day">‹</button><label><span>READING DATE</span><input type="date" id="planDate" value="'+state.planDate+'"></label><button class="mini" data-plandate="1" aria-label="Next reading day">›</button></div>'+body+
@@ -1382,10 +1387,12 @@ function noteListView(sec){
     var preview=notePreviewText(n.body,n.format)||'No note text yet.';
     var d=new Date(n.updated||n.created||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     var chars=(n.format==='html'?richPlainText(n.body):String(n.body||'')).length;
-    return '<button class="note-list-card" data-noteopen="'+n.id+'">'+
-      '<span class="note-list-top"><b>'+esc(title)+'</b><small>'+esc(d)+'</small></span>'+
-      '<span class="note-list-preview">'+esc(preview)+'</span>'+
-      '<span class="note-list-meta">'+chars.toLocaleString()+' CHARACTERS'+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button>';
+    return '<div class="note-swipe-row" data-noteswipe="'+n.id+'">'+
+      '<button class="note-swipe-delete" type="button" data-noteswipedelete="'+n.id+'">DELETE</button>'+
+      '<button class="note-list-card note-swipe-card" data-noteopen="'+n.id+'">'+
+        '<span class="note-list-top"><b>'+esc(title)+'</b><small>'+esc(d)+'</small></span>'+
+        '<span class="note-list-preview">'+esc(preview)+'</span>'+
+        '<span class="note-list-meta">'+chars.toLocaleString()+' CHARACTERS'+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button></div>';
   }).join(''):emptyBox('NO NOTES YET','Create a note and it will appear here with its title and a preview.');
   return '<div class="pad notes-page">'+screenHead('Notes','Saved, titled notes with rich text editing')+
     notesTabsHTML()+
@@ -1819,7 +1826,8 @@ function render(){
   document.body.classList.toggle("reminder-open",!!state.reminderTarget);
   var back=$("globalBack"); if(back) back.hidden=!backAvailable();
   var scr=$("screen");
-  var keepScroll=(state.tab==="bible" && state.bview==="read") ? scr.scrollTop : 0;
+  var preserveScroll=(state.tab==="bible" && state.bview==="read") || (state.tab==="devotion" && state.devMode==="plan");
+  var keepScroll=preserveScroll ? scr.scrollTop : 0;
   scr.innerHTML=screenHTML();
   scr.scrollTop=keepScroll;
 
@@ -1875,7 +1883,6 @@ function wire(scr){
   if(pd) pd.onchange=function(){ state.planDate=pd.value; render(); };
   var planStart=$("planStartDate"), planDuration=$("planDuration"), planReminderEnabled=$("planReminderEnabled"), planReminderTime=$("planReminderTime");
   [planStart,planDuration,planReminderEnabled,planReminderTime].forEach(function(el){ if(el) el.onchange=function(){ savePlanSetupFromUI(); render(); }; });
-  on(scr,"[data-plantoday]",function(b){ b.onclick=function(){ state.planDate=stampOf(new Date()); render(); }; });
   on(scr,"[data-plandate]",function(b){ b.onclick=function(){ var d=dateAtNoon(state.planDate); d.setDate(d.getDate()+(+b.dataset.plandate)); state.planDate=stampOf(d); render(); }; });
   on(scr,"[data-plan]",function(b){
     b.onclick=function(e){
@@ -1975,7 +1982,59 @@ function wire(scr){
   on(scr,"[data-notenew]",function(b){
     b.onclick=function(){ var doc=createDoc(b.dataset.notenew); state.noteSection=b.dataset.notenew; state.noteId=doc.id; state.notePreview=false; render(); setTimeout(function(){var t=$("noteTitle");if(t)t.focus();},20); };
   });
-  on(scr,"[data-noteopen]",function(b){ b.onclick=function(){ state.noteId=b.dataset.noteopen; state.notePreview=false; render(); }; });
+  on(scr,"[data-noteopen]",function(b){
+    b.onclick=function(e){
+      var row=b.closest("[data-noteswipe]");
+      if(row && row.dataset.swiped==="1"){ row.dataset.swiped="0"; return; }
+      state.noteId=b.dataset.noteopen; state.notePreview=false; render();
+    };
+  });
+  on(scr,"[data-noteswipedelete]",function(b){
+    b.onclick=function(e){
+      e.stopPropagation();
+      if(b.dataset.armed==="1"){
+        deleteDoc(state.noteSection,b.dataset.noteswipedelete);
+        toast("Note deleted");
+        render();
+      } else {
+        b.dataset.armed="1";
+        b.textContent="TAP AGAIN";
+        b.classList.add("armed");
+      }
+    };
+  });
+  on(scr,"[data-noteswipe]",function(row){
+    var card=row.querySelector(".note-swipe-card"), startX=0, startY=0, dx=0, dragging=false;
+    if(!card) return;
+    card.addEventListener("touchstart",function(e){
+      var t=e.touches&&e.touches[0]; if(!t) return;
+      startX=t.clientX; startY=t.clientY; dx=0; dragging=true; row.dataset.swiped="0";
+    },{passive:true});
+    card.addEventListener("touchmove",function(e){
+      if(!dragging) return;
+      var t=e.touches&&e.touches[0]; if(!t) return;
+      dx=t.clientX-startX; var dy=t.clientY-startY;
+      if(Math.abs(dy)>Math.abs(dx)) return;
+      if(dx<0){
+        var amount=Math.max(-88,dx);
+        card.style.transform="translateX("+amount+"px)";
+      } else if(row.classList.contains("open")){
+        card.style.transform="translateX("+Math.min(0,-88+dx)+"px)";
+      }
+    },{passive:true});
+    card.addEventListener("touchend",function(){
+      if(!dragging) return; dragging=false;
+      if(dx<-38){
+        [].forEach.call(scr.querySelectorAll(".note-swipe-row.open"),function(other){ if(other!==row){ other.classList.remove("open"); var c=other.querySelector(".note-swipe-card"); if(c)c.style.transform=""; } });
+        row.classList.add("open"); row.dataset.swiped="1"; card.style.transform="";
+      } else if(dx>28){
+        row.classList.remove("open"); row.dataset.swiped="1"; card.style.transform="";
+      } else {
+        card.style.transform="";
+      }
+      dx=0;
+    },{passive:true});
+  });
   on(scr,"[data-noteback]",function(b){ b.onclick=function(){ saveOpenNote(); state.noteId=null; state.notePreview=false; render(); }; });
   on(scr,"[data-notesave]",function(b){ b.onclick=function(){ saveOpenNote(); state.noteId=null; state.notePreview=false; toast("Note saved"); render(); }; });
   on(scr,"[data-notedelete]",function(b){

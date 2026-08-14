@@ -173,3 +173,11 @@ This remains a static PWA. Browser notification permission lets the app show OS 
 - Verse selections clear after an action is completed.
 - Note and prayer reminder dialogs are forced above the bottom navigation and save controls.
 - Reading-plan date and plan fields use smaller, contained typography to prevent overlap.
+
+
+## v29 updates
+- Tightened Reading Plan start-date and plan controls; plan choices now show daily reading counts.
+- New/reset plans default to the current date and the redundant in-card Today control was removed.
+- Completing a reading preserves the current scroll position.
+- Enlarged and evenly spaced the four note-type tabs.
+- Saved note cards can be swiped left to reveal a two-press Delete control.
