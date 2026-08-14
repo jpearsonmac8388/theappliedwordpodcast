@@ -188,3 +188,9 @@ This remains a static PWA. Browser notification permission lets the app show OS 
 - Removed the History tab and activity-history tracking. Settings now occupies the fifth bottom-navigation position; the header gear was removed.
 - Added device-local attachments to saved notes and prayer requests. Notes/prayers can attach multiple arbitrary files/photos or links with no app-defined extension or file-size cap. Actual storage is limited only by the browser/device storage quota.
 - File attachment bodies are stored in IndexedDB while attachment metadata remains with the note/prayer record.
+
+
+## v31 update
+- Rebuilt the Reading Plan date fields so Safari/iOS native date text can no longer sit high in the control.
+- Start Date is now a compact fixed-width selector.
+- Reading Date remains compact, centered, and sits inside a full-width card matching the other Reading Plan cards.

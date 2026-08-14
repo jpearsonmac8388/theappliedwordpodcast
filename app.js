@@ -277,6 +277,7 @@ function mcheyneDays(){
   return out;
 }
 function dateAtNoon(str){ var p=String(str||"").split("-"); return new Date(+p[0],(+p[1]||1)-1,+p[2]||1,12,0,0,0); }
+function planDateDisplay(str){ var d=dateAtNoon(str); if(isNaN(d.getTime())) return String(str||""); return d.toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"numeric"}); }
 function planDurationLabel(duration){ return duration==="sixmonth"?"6 Month Plan":"1 Year Plan"; }
 function planReadingsPerDay(duration){ return duration==="sixmonth"?8:4; }
 function planCalendarDays(duration){ return duration==="sixmonth"?Math.ceil(mcheyneDays().length/2):mcheyneDays().length; }
@@ -1189,10 +1190,10 @@ function plansView(){
     screenHead("Reading Plan","M’Cheyne · "+planDurationLabel(setup.duration))+
     '<div class="tabsel devotion-tabs devotion-switch"><button data-dev="today">TODAY</button><button class="on" data-dev="plan">READING PLAN</button></div>'+
     '<div class="content-card plan-setup-card"><div class="plan-setup-head"><div><div class="content-kicker">YOUR PLAN</div><b>'+stats.days+' DAYS COMPLETED</b><small>'+stats.readings+' OF '+stats.totalReadings+' READINGS</small></div></div>'+
-      '<div class="plan-setup-grid"><label><span>START DATE</span><input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label><span>PLAN</span><select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year · 4/day</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Months · 8/day</option></select></label></div>'+
+      '<div class="plan-setup-grid"><label class="plan-start-label"><span>START DATE</span><span class="date-input-shell"><span class="date-input-value">'+esc(planDateDisplay(setup.startDate))+'</span><input type="date" id="planStartDate" value="'+esc(setup.startDate)+'" aria-label="Start date"></span></label><label class="plan-choice-label"><span>PLAN</span><select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year · 4/day</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Months · 8/day</option></select></label></div>'+
       '<div class="plan-reminder-row"><label class="toggle-row"><input type="checkbox" id="planReminderEnabled"'+(setup.reminderEnabled?' checked':'')+'><span></span><b>Reading reminder</b></label><label class="plan-reminder-time-label">TIME<input type="time" id="planReminderTime" value="'+esc(setup.reminderTime)+'"></label></div>'+
       '<p>The 1 Year plan follows one M’Cheyne calendar day each day. The 6 Month plan combines two consecutive M’Cheyne days so the same reading schedule is completed in about half the time.</p></div>'+
-    '<div class="plan-date-nav"><button class="mini" data-plandate="-1" aria-label="Previous reading day">‹</button><label><span>READING DATE</span><input type="date" id="planDate" value="'+state.planDate+'"></label><button class="mini" data-plandate="1" aria-label="Next reading day">›</button></div>'+body+
+    '<div class="plan-date-nav"><button class="mini" data-plandate="-1" aria-label="Previous reading day">‹</button><label><span>READING DATE</span><span class="date-input-shell reading-date-shell"><span class="date-input-value">'+esc(planDateDisplay(state.planDate))+'</span><input type="date" id="planDate" value="'+state.planDate+'" aria-label="Reading date"></span></label><button class="mini" data-plandate="1" aria-label="Next reading day">›</button></div>'+body+
     '<div class="foot">PUBLIC DOMAIN · ST. PETER’S, DUNDEE, 1842</div></div>';
 }
 

@@ -1783,3 +1783,98 @@ body.reminder-open .reminder-actions{
   .attachment-link-row{grid-template-columns:1fr}
   .attachment-link-row button{width:100%}
 }
+
+
+/* ============================================================
+   v31 — definitive reading-plan date control fix
+   ============================================================ */
+/* Make the Start Date compact instead of stretching across the setup card. */
+.plan-setup-grid{
+  grid-template-columns:124px minmax(0,1fr)!important;
+  gap:8px!important;
+  align-items:end!important;
+}
+.plan-start-label{width:124px!important;min-width:124px!important;overflow:visible!important}
+.plan-choice-label{min-width:0!important}
+
+/* Do not render the browser's native date text. It sits differently on iOS/Safari.
+   The transparent native input remains over the app-styled value so tapping anywhere
+   still opens the normal device date picker. */
+.date-input-shell{
+  position:relative!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:124px!important;
+  height:34px!important;
+  min-height:34px!important;
+  padding:0 8px!important;
+  overflow:hidden!important;
+  border:1px solid var(--line)!important;
+  border-radius:9px!important;
+  background:var(--surface)!important;
+  color:var(--bone)!important;
+}
+.date-input-value{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  height:100%!important;
+  padding:0!important;
+  margin:0!important;
+  font-family:var(--slab)!important;
+  font-size:11px!important;
+  font-weight:600!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+  text-align:center!important;
+  pointer-events:none!important;
+}
+.date-input-shell input[type="date"]{
+  position:absolute!important;
+  inset:0!important;
+  z-index:2!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:inherit!important;
+  opacity:0!important;
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  font-size:16px!important;
+  cursor:pointer!important;
+}
+
+/* Reading Date is a full-width card like the rest of the Reading Plan surfaces,
+   while the actual date selector remains compact and centered. */
+.plan-date-nav{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:none!important;
+  grid-template-columns:34px 124px 34px!important;
+  justify-content:center!important;
+  align-items:end!important;
+  gap:8px!important;
+  margin:12px 0 4px!important;
+  padding:10px 12px!important;
+}
+.plan-date-nav label{
+  box-sizing:border-box!important;
+  width:124px!important;
+  min-width:124px!important;
+  align-items:center!important;
+}
+.plan-date-nav .reading-date-shell{width:124px!important}
+.plan-date-nav>button{align-self:end!important;height:34px!important;min-width:34px!important}
+
+@media(max-width:360px){
+  .plan-setup-grid{grid-template-columns:116px minmax(0,1fr)!important;gap:6px!important}
+  .plan-start-label,.plan-start-label .date-input-shell{width:116px!important;min-width:116px!important}
+  .plan-date-nav{grid-template-columns:32px 116px 32px!important;gap:6px!important}
+  .plan-date-nav label,.plan-date-nav .reading-date-shell{width:116px!important;min-width:116px!important}
+}
