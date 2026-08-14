@@ -181,3 +181,10 @@ This remains a static PWA. Browser notification permission lets the app show OS 
 - Completing a reading preserves the current scroll position.
 - Enlarged and evenly spaced the four note-type tabs.
 - Saved note cards can be swiped left to reveal a two-press Delete control.
+
+
+## v30 updates
+- Narrowed and vertically centered the Reading Plan date selector.
+- Removed the History tab and activity-history tracking. Settings now occupies the fifth bottom-navigation position; the header gear was removed.
+- Added device-local attachments to saved notes and prayer requests. Notes/prayers can attach multiple arbitrary files/photos or links with no app-defined extension or file-size cap. Actual storage is limited only by the browser/device storage quota.
+- File attachment bodies are stored in IndexedDB while attachment metadata remains with the note/prayer record.

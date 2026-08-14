@@ -1622,3 +1622,164 @@ body.reminder-open .reminder-actions{
   touch-action:pan-y;
 }
 .note-swipe-row.open .note-swipe-card{transform:translateX(-88px)}
+
+/* ============================================================
+   v30 — compact reading date, Settings nav, attachments
+   ============================================================ */
+/* Reading date: narrower box and true vertical centering. */
+.plan-date-nav{
+  grid-template-columns:34px 124px 34px!important;
+  gap:6px!important;
+  width:max-content!important;
+  max-width:100%!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+.plan-date-nav label{width:124px!important;min-width:0!important}
+.plan-date-nav input[type="date"]{
+  box-sizing:border-box!important;
+  width:124px!important;
+  height:34px!important;
+  min-height:34px!important;
+  padding:0 5px!important;
+  line-height:34px!important;
+  display:block!important;
+  text-align:center!important;
+  text-align-last:center!important;
+}
+.plan-date-nav input[type="date"]::-webkit-date-and-time-value{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  height:34px!important;
+  min-height:34px!important;
+  line-height:34px!important;
+  padding:0!important;
+  margin:0!important;
+  text-align:center!important;
+}
+.plan-date-nav input[type="date"]::-webkit-datetime-edit{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  height:34px!important;
+  line-height:34px!important;
+  padding:0!important;
+  margin:0!important;
+}
+.plan-date-nav input[type="date"]::-webkit-datetime-edit-fields-wrapper{
+  display:flex!important;
+  align-items:center!important;
+  height:34px!important;
+  padding:0!important;
+}
+.plan-date-nav>button{height:34px!important;min-width:34px!important}
+@media(max-width:360px){
+  .plan-date-nav{grid-template-columns:32px 116px 32px!important}
+  .plan-date-nav label,.plan-date-nav input[type="date"]{width:116px!important}
+}
+
+/* Header now stays visually balanced without a settings button on the right. */
+.app-header>.header-spacer{width:34px!important;height:34px!important}
+
+/* Attachments */
+.attachment-box{
+  margin-top:12px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-card);
+  background:linear-gradient(150deg,var(--surface),var(--surface-2));
+  box-shadow:0 7px 20px rgba(0,0,0,.07);
+}
+.attachment-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.attachment-head>div{min-width:0}
+.attachment-head p{margin-top:4px;font-family:var(--slab);font-size:10.5px;line-height:1.4;color:var(--ash)}
+.attachment-file-btn{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:7px 10px;
+  border:1px solid color-mix(in srgb,var(--brass) 28%,transparent);
+  border-radius:var(--radius-control);
+  background:color-mix(in srgb,var(--brass) 10%,var(--surface));
+  color:var(--brass);
+  font-family:var(--util);
+  font-size:7.4px;
+  font-weight:800;
+  letter-spacing:.055em;
+  cursor:pointer;
+}
+.attachment-file-btn input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+.attachment-link-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-top:10px}
+.attachment-link-row input{
+  min-width:0;
+  width:100%;
+  height:36px;
+  padding:0 10px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-control);
+  background:color-mix(in srgb,var(--forge) 20%,var(--surface));
+  color:var(--bone);
+  font-family:var(--slab);
+  font-size:16px;
+}
+.attachment-list{display:grid;gap:7px;margin-top:10px}
+.attachment-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 32px;
+  gap:5px;
+  align-items:stretch;
+  min-width:0;
+  border:1px solid var(--line);
+  border-radius:11px;
+  overflow:hidden;
+  background:color-mix(in srgb,var(--forge) 14%,var(--surface));
+}
+.attachment-open{
+  min-width:0;
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr);
+  gap:9px;
+  align-items:center;
+  padding:9px;
+  border:0!important;
+  background:transparent!important;
+  color:var(--bone)!important;
+  text-align:left;
+}
+.attachment-type{
+  min-height:28px;
+  display:grid;
+  place-items:center;
+  padding:4px;
+  border:1px solid color-mix(in srgb,var(--brass) 22%,transparent);
+  border-radius:8px;
+  background:color-mix(in srgb,var(--brass) 9%,transparent);
+  color:var(--brass);
+  font-family:var(--util);
+  font-size:6.5px;
+  font-weight:800;
+  letter-spacing:.04em;
+}
+.attachment-open b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--slab);font-size:11.5px}
+.attachment-open small{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--util);font-size:6.4px;letter-spacing:.03em;color:var(--ash)}
+.attachment-remove{
+  width:32px;
+  border:0!important;
+  border-left:1px solid var(--line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:var(--ash)!important;
+  font-size:18px!important;
+}
+.attachment-empty{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:10px;text-align:center;font-family:var(--slab);font-size:10.5px;color:var(--ash)}
+.attachment-note{margin-top:8px;font-family:var(--util);font-size:6.5px;line-height:1.4;letter-spacing:.045em;color:var(--ash)}
+@media(max-width:380px){
+  .attachment-head{display:block}
+  .attachment-file-btn{margin-top:8px}
+  .attachment-link-row{grid-template-columns:1fr}
+  .attachment-link-row button{width:100%}
+}

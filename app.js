@@ -153,9 +153,8 @@ var state = {
   spData: null, spState: "idle",
   // plans
   planDate: stampOf(new Date()),
-  // history
-  historyTab: "activity",
   theme: ls("theme") || "classic",
+  settingsPrimary: false,
   heroIndex: +(ls("heroIndex") || -1),
   // card
   cardRatio: "9:16", cardVerse: null,
@@ -176,7 +175,7 @@ var state = {
 try{
   var initialParams=new URLSearchParams(location.search);
   var initialTab=initialParams.get("tab"), initialSection=initialParams.get("section"), initialNote=initialParams.get("note"), initialPrayer=initialParams.get("prayer");
-  if(["devotion","podcast","bible","notes","history"].indexOf(initialTab)>-1) state.tab=initialTab;
+  if(["devotion","podcast","bible","notes","settings"].indexOf(initialTab)>-1){ state.tab=initialTab; state.settingsPrimary=initialTab==="settings"; }
   if(["sermon","prayer","study","men"].indexOf(initialSection)>-1) state.noteSection=initialSection;
   if(initialNote) state.noteId=initialNote;
   if(initialPrayer) state.prayerId=initialPrayer;
@@ -338,13 +337,14 @@ function normalizeNoteLibrary(lib){
   if(!lib.docs) lib.docs={};
   ["sermon","study","men"].forEach(function(k){
     if(!Array.isArray(lib.docs[k])) lib.docs[k]=[];
-    lib.docs[k].forEach(function(n){ if(n.reminder) n.reminder=cleanReminder(n.reminder); if(!n.format) n.format=(n.body&&/<[a-z][\s\S]*>/i.test(n.body))?"html":"markdown"; });
+    lib.docs[k].forEach(function(n){ if(n.reminder) n.reminder=cleanReminder(n.reminder); if(!n.format) n.format=(n.body&&/<[a-z][\s\S]*>/i.test(n.body))?"html":"markdown"; if(!Array.isArray(n.attachments)) n.attachments=[]; });
   });
   if(!Array.isArray(lib.prayers)) lib.prayers=[];
   lib.prayers.forEach(function(r){
     if(!r.category || PRAYER_CATEGORIES.indexOf(r.category)<0) r.category="Personal";
     r.pinned=!!r.pinned;
     if(r.reminder) r.reminder=cleanReminder(r.reminder);
+    if(!Array.isArray(r.attachments)) r.attachments=[];
   });
   return lib;
 }
@@ -366,7 +366,7 @@ function saveNoteLibrary(lib){ jset("noteLibrary",normalizeNoteLibrary(lib)); }
 function docsFor(section){ var lib=noteLibrary(); return (lib.docs[section]||[]).slice().sort(function(a,b){return (b.updated||0)-(a.updated||0);}); }
 function findDoc(section,id){ return docsFor(section).find(function(n){return n.id===id;}) || null; }
 function createDoc(section){
-  var lib=noteLibrary(), now=Date.now(), doc={id:makeId("note"),title:"",body:"",format:"html",created:now,updated:now};
+  var lib=noteLibrary(), now=Date.now(), doc={id:makeId("note"),title:"",body:"",format:"html",attachments:[],created:now,updated:now};
   lib.docs[section].unshift(doc); saveNoteLibrary(lib); return doc;
 }
 function saveDoc(section,id,title,body,format){
@@ -376,8 +376,101 @@ function saveDoc(section,id,title,body,format){
   saveNoteLibrary(lib); return doc;
 }
 function deleteDoc(section,id){
-  var lib=noteLibrary(); lib.docs[section]=(lib.docs[section]||[]).filter(function(n){return n.id!==id;}); saveNoteLibrary(lib);
+  var lib=noteLibrary(), doc=(lib.docs[section]||[]).find(function(n){return n.id===id;});
+  if(doc) cleanupAttachments(doc.attachments);
+  lib.docs[section]=(lib.docs[section]||[]).filter(function(n){return n.id!==id;}); saveNoteLibrary(lib);
 }
+/* ---------- note & prayer attachments ---------- */
+function attachmentOwner(lib,target){
+  if(!target) return null;
+  if(target.type==="prayer") return (lib.prayers||[]).find(function(x){return x.id===target.id;}) || null;
+  if(target.type==="note") return ((lib.docs||{})[target.section]||[]).find(function(x){return x.id===target.id;}) || null;
+  return null;
+}
+function attachmentsFor(target){
+  var owner=attachmentOwner(noteLibrary(),target);
+  return owner&&Array.isArray(owner.attachments)?owner.attachments.slice():[];
+}
+function currentAttachmentTarget(){
+  if(state.tab!=="notes") return null;
+  if(state.prayerId) return {type:"prayer",id:state.prayerId};
+  if(state.noteId && state.noteSection!=="prayer") return {type:"note",section:state.noteSection,id:state.noteId};
+  return null;
+}
+function prettyBytes(n){
+  n=Number(n)||0; if(n<1024) return n+" B";
+  var u=["KB","MB","GB","TB"], i=-1, v=n;
+  do{v/=1024;i++;}while(v>=1024&&i<u.length-1);
+  return (v>=10?v.toFixed(0):v.toFixed(1))+" "+u[i];
+}
+function attachmentKind(a){
+  if(a.kind==="link") return "LINK";
+  if((a.type||"").indexOf("image/")===0) return "PHOTO";
+  return "FILE";
+}
+function addAttachmentMeta(target,meta){
+  var lib=noteLibrary(), owner=attachmentOwner(lib,target); if(!owner) return false;
+  if(!Array.isArray(owner.attachments)) owner.attachments=[];
+  owner.attachments.push(meta); owner.updated=Date.now(); saveNoteLibrary(lib); return true;
+}
+function saveAttachmentFiles(target,fileList){
+  var files=Array.prototype.slice.call(fileList||[]); if(!target||!files.length) return Promise.resolve();
+  if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){});
+  var saved=0;
+  return files.reduce(function(chain,file){
+    return chain.then(function(){
+      var id=makeId("att");
+      return store.set("attachment:"+id,file).then(function(){
+        addAttachmentMeta(target,{id:id,kind:"file",name:file.name||"Attachment",type:file.type||"",size:file.size||0,created:Date.now()});
+        saved++;
+      });
+    });
+  },Promise.resolve()).then(function(){
+    if(saved) toast(saved===1?"Attachment added":saved+" attachments added");
+  }).catch(function(){ toast(saved?"Some attachments were added; device storage is full":"This device does not have enough available storage for that attachment"); });
+}
+function normalizeLink(url){
+  url=String(url||"").trim(); if(!url) return "";
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(url)) url="https://"+url;
+  if(/^javascript:/i.test(url)||/^data:/i.test(url)) return "";
+  return url;
+}
+function addLinkAttachment(target,url){
+  url=normalizeLink(url); if(!url){ toast("Enter a valid link"); return false; }
+  var name=url.replace(/^https?:\/\//i,"").replace(/\/$/,"");
+  addAttachmentMeta(target,{id:makeId("link"),kind:"link",name:snip(name,80),url:url,created:Date.now()});
+  toast("Link added"); return true;
+}
+function removeAttachment(target,id){
+  var lib=noteLibrary(), owner=attachmentOwner(lib,target); if(!owner) return;
+  var found=(owner.attachments||[]).find(function(a){return a.id===id;});
+  owner.attachments=(owner.attachments||[]).filter(function(a){return a.id!==id;}); owner.updated=Date.now(); saveNoteLibrary(lib);
+  if(found&&found.kind!=="link") store.del("attachment:"+id).catch(function(){});
+}
+function cleanupAttachments(list){
+  (list||[]).forEach(function(a){ if(a&&a.kind!=="link"&&a.id) store.del("attachment:"+a.id).catch(function(){}); });
+}
+function openAttachment(target,id){
+  var a=attachmentsFor(target).find(function(x){return x.id===id;}); if(!a) return;
+  if(a.kind==="link"){ window.open(a.url,"_blank","noopener"); return; }
+  store.get("attachment:"+id).then(function(blob){
+    if(!blob){ toast("Attachment file is no longer available on this device"); return; }
+    var url=URL.createObjectURL(blob), link=document.createElement("a");
+    link.href=url; link.target="_blank"; link.rel="noopener";
+    var displayable=(a.type||"").indexOf("image/")===0 || a.type==="application/pdf" || (a.type||"").indexOf("text/")===0;
+    if(!displayable) link.download=a.name||"attachment";
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(function(){URL.revokeObjectURL(url);},12000);
+  }).catch(function(){ toast("Could not open attachment"); });
+}
+function attachmentSectionHTML(target){
+  var list=attachmentsFor(target);
+  return '<section class="attachment-box"><div class="attachment-head"><div><div class="content-kicker">ATTACHMENTS</div><p>Files, photos, or links. No app-imposed file type or size limit.</p></div><label class="attachment-file-btn">+ FILE / PHOTO<input type="file" data-attachfile="1" multiple></label></div>'+ 
+    '<div class="attachment-link-row"><input id="attachmentLinkInput" type="url" inputmode="url" placeholder="Paste a link"><button class="secondary-btn compact" data-attachlink="1">ADD LINK</button></div>'+ 
+    (list.length?'<div class="attachment-list">'+list.map(function(a){return '<div class="attachment-row"><button class="attachment-open" data-attachopen="'+a.id+'"><span class="attachment-type">'+attachmentKind(a)+'</span><span><b>'+esc(a.name||'Attachment')+'</b><small>'+(a.kind==='link'?esc(snip(a.url||'',72)):esc(prettyBytes(a.size))+(a.type?' · '+esc(a.type):''))+'</small></span></button><button class="attachment-remove" data-attachremove="'+a.id+'" aria-label="Remove attachment">×</button></div>';}).join('')+'</div>':'<div class="attachment-empty">No attachments yet.</div>')+
+    '<div class="attachment-note">Stored on this device. Actual capacity depends on available browser/device storage.</div></section>';
+}
+
 function prayerRequests(){
   return noteLibrary().prayers.slice().sort(function(a,b){
     if(!!a.answered!==!!b.answered) return a.answered?1:-1;
@@ -386,7 +479,7 @@ function prayerRequests(){
   });
 }
 function createPrayer(textVal,category){
-  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:String(textVal||"").trim(),answered:false,category:PRAYER_CATEGORIES.indexOf(category)>-1?category:"Personal",pinned:false,reminder:null,created:now,updated:now};
+  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:String(textVal||"").trim(),answered:false,category:PRAYER_CATEGORIES.indexOf(category)>-1?category:"Personal",pinned:false,reminder:null,attachments:[],created:now,updated:now};
   lib.prayers.unshift(item); saveNoteLibrary(lib); return item;
 }
 function savePrayer(id,textVal){
@@ -397,7 +490,7 @@ function togglePrayer(id){
   var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(!item) return;
   item.answered=!item.answered; item.updated=Date.now(); saveNoteLibrary(lib);
 }
-function deletePrayer(id){ var lib=noteLibrary(); lib.prayers=lib.prayers.filter(function(x){return x.id!==id;}); saveNoteLibrary(lib); }
+function deletePrayer(id){ var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(item) cleanupAttachments(item.attachments); lib.prayers=lib.prayers.filter(function(x){return x.id!==id;}); saveNoteLibrary(lib); }
 function setPrayerCategory(id,category){
   var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(!item) return;
   item.category=PRAYER_CATEGORIES.indexOf(category)>-1?category:"Other"; item.updated=Date.now(); saveNoteLibrary(lib);
@@ -734,28 +827,10 @@ function markWalk(){
 }
 
 
-/* ---------- activity history ---------- */
-function activity(){ return jget("activity",[]); }
-function logActivity(type, ref, detail){
-  var list=activity(), now=Date.now(), last=list[0];
-  if(last && last.type===type && last.ref===ref && now-last.at<15000) return;
-  list.unshift({type:type,ref:ref||"",detail:detail||"",at:now});
-  if(list.length>250) list=list.slice(0,250);
-  jset("activity",list);
-}
-function recordChapterRead(b,c){
-  logActivity("read", BOOKS[b]+" "+c, "Bible reading");
-}
-function activityIcon(type){
-  return {walk:"✦",read:"▤",highlight:"●",note:"✎",share:"↗",card:"□",
-    category:"⊕",podcast:"▶",download:"⇩",plan:"✓"}[type] || "•";
-}
-function activityLabel(type){
-  return {walk:"Devotional completed",read:"Read Scripture",highlight:"Highlighted verse",
-    note:"Added a note",share:"Shared a verse",card:"Created a verse card",
-    category:"Added verse category",podcast:"Opened podcast",download:"Downloaded Bible",
-    plan:"Completed plan reading"}[type] || "Activity";
-}
+/* ---------- activity history removed ---------- */
+function activity(){ return []; }
+function logActivity(){ }
+function recordChapterRead(){ }
 
 /* ---------- bible access ---------- */
 function verseText(b,c,v){
@@ -1392,7 +1467,7 @@ function noteListView(sec){
       '<button class="note-list-card note-swipe-card" data-noteopen="'+n.id+'">'+
         '<span class="note-list-top"><b>'+esc(title)+'</b><small>'+esc(d)+'</small></span>'+
         '<span class="note-list-preview">'+esc(preview)+'</span>'+
-        '<span class="note-list-meta">'+chars.toLocaleString()+' CHARACTERS'+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button></div>';
+        '<span class="note-list-meta">'+chars.toLocaleString()+' CHARACTERS'+((n.attachments||[]).length?' · 📎 '+(n.attachments||[]).length:'')+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button></div>';
   }).join(''):emptyBox('NO NOTES YET','Create a note and it will appear here with its title and a preview.');
   return '<div class="pad notes-page">'+screenHead('Notes','Saved, titled notes with rich text editing')+
     notesTabsHTML()+
@@ -1420,6 +1495,7 @@ function noteEditorView(sec,doc){
       '<button type="button" data-rich="redo" aria-label="Redo" title="Redo">↷</button>'+
     '</div>'+
     '<div id="notesEditor" class="notes-editor rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Write your note…">'+docRichHTML(doc)+'</div>'+
+    attachmentSectionHTML({type:"note",section:sec.id,id:doc.id})+
     '<div class="note-editor-actions"><button class="secondary-btn danger" data-notedelete="'+doc.id+'">DELETE</button><button class="primary-btn" data-notesave="1">SAVE NOTE</button></div>'+
     '<div class="notes-meta">RICH TEXT · AUTOSAVED ON THIS DEVICE</div></div>';
 }
@@ -1439,7 +1515,7 @@ function prayerNotesView(sec){
       '<button class="prayer-summary-open" data-prayeropen="'+r.id+'">'+
         '<span class="prayer-summary-top"><span class="prayer-cat-chip">'+esc(r.category||'Personal')+'</span><small>'+(r.pinned?'📌 PINNED · ':'')+esc(d)+'</small></span>'+
         '<span class="prayer-summary-preview">'+esc(snip(r.text||'Prayer request',180))+'</span>'+
-        '<span class="prayer-summary-meta">'+(r.reminder?'🔔 '+esc(reminderSummary(r.reminder)):'NO REMINDER')+(r.answered?' · ANSWERED':'')+'</span>'+
+        '<span class="prayer-summary-meta">'+(r.reminder?'🔔 '+esc(reminderSummary(r.reminder)):'NO REMINDER')+((r.attachments||[]).length?' · 📎 '+(r.attachments||[]).length:'')+(r.answered?' · ANSWERED':'')+'</span>'+
       '</button>'+
       '<div class="prayer-summary-actions"><button class="secondary-btn compact" data-prayertoggle="'+r.id+'">'+(r.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button><button class="icon-only-btn" data-reminderprayer="'+r.id+'" aria-label="Set prayer reminder">🔔</button></div>'+
     '</div>';
@@ -1461,6 +1537,7 @@ function prayerEditorView(sec,prayer){
     '<label class="field-label">CATEGORY<select id="prayerEditCategory">'+PRAYER_CATEGORIES.map(function(c){return '<option value="'+esc(c)+'"'+(prayer.category===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></label>'+
     '<textarea id="prayerEditText" class="prayer-editor-text" placeholder="What do you want to pray for?">'+esc(prayer.text||'')+'</textarea>'+
     '<button class="reminder-strip" data-reminderprayer="'+prayer.id+'"><span>🔔</span><span><b>Reminder</b><small>'+esc(prayer.reminder?reminderSummary(prayer.reminder):'Not set')+'</small></span><span>›</span></button>'+
+    attachmentSectionHTML({type:"prayer",id:prayer.id})+
     '<div class="prayer-editor-toggles"><button class="secondary-btn" data-prayerpin="'+prayer.id+'">'+(prayer.pinned?'UNPIN REQUEST':'PIN TO TOP')+'</button><button class="secondary-btn" data-prayertoggle="'+prayer.id+'">'+(prayer.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button></div>'+
     '<div class="note-editor-actions prayer-editor-actions"><button class="secondary-btn danger" data-prayerdelete="'+prayer.id+'">DELETE</button><button class="primary-btn" data-prayersaveedit="'+prayer.id+'">SAVE REQUEST</button></div>'+
     '<div class="notes-meta">NO CHARACTER LIMIT · SAVED ON THIS DEVICE</div></div>';
@@ -1499,73 +1576,6 @@ function notesView(){
 
 function emptyBox(h,p){
   return '<div class="empty"><h4>'+h+'</h4><p>'+p+'</p></div>';
-}
-
-/* ============================================================
-   HISTORY + SAVED
-   ============================================================ */
-function historyView(){
-  var t=state.historyTab;
-  var m=marks(), markedKeys=Object.keys(m);
-  var noteN=markedKeys.filter(function(k){return !!m[k].note;}).length;
-  var hlN=markedKeys.filter(function(k){return !!m[k].hl;}).length;
-
-  var body=t==="saved" ? savedHistoryRows() : activityRows();
-  return '<div class="pad">'+
-    screenHead("History","Your reading and app activity")+
-    '<div class="history-stats">'+
-      '<div><b>'+getStreak()+'</b><span>STREAK</span></div>'+
-      '<div><b>'+hlN+'</b><span>HIGHLIGHTS</span></div>'+
-      '<div><b>'+noteN+'</b><span>NOTES</span></div>'+
-    '</div>'+
-    '<div class="tabsel">'+
-      '<button class="'+(t==="activity"?"on":"")+'" data-history="activity">ACTIVITY</button>'+
-      '<button class="'+(t==="saved"?"on":"")+'" data-history="saved">SAVED</button>'+
-    '</div>'+
-    '<div class="history-body">'+body+'</div>'+
-    (t==="activity" && activity().length ? '<button class="text-action" data-clearhistory="1">CLEAR ACTIVITY HISTORY</button>' : '')+
-    '<div class="foot">YOUR NOTES AND MARKS STAY ON THIS DEVICE</div></div>';
-}
-
-function activityRows(){
-  var rows=activity().filter(function(a){return a.type!=="bookmark";});
-  if(!rows.length) return emptyBox("NO ACTIVITY YET","As you read, highlight, take notes, share verses, and complete devotions, your recent activity will appear here.");
-  return '<div class="timeline">'+rows.map(function(a){
-    var d=new Date(a.at);
-    var when=d.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" · "+
-      d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
-    var jump="";
-    var m=String(a.ref||"").match(/^(.+?)\s+(\d+)(?::(\d+))?$/);
-    if(m){
-      var b=resolveBook(m[1]);
-      if(b!==undefined) jump=' data-jumpverse="'+b+':'+(+m[2])+':'+(m[3]?+m[3]:1)+'"';
-    }
-    return '<button class="timeline-row"'+jump+'>'+
-      '<span class="timeline-icon">'+activityIcon(a.type)+'</span>'+
-      '<span class="timeline-copy"><b>'+esc(activityLabel(a.type))+'</b>'+
-      (a.ref?'<em>'+esc(a.ref)+'</em>':'')+
-      '<small>'+esc(when)+'</small></span></button>';
-  }).join("")+'</div>';
-}
-
-function savedHistoryRows(){
-  var m=marks();
-  var keys=Object.keys(m).sort(function(a,b){ return (m[b].at||0)-(m[a].at||0); });
-  var saved=[];
-
-  keys.forEach(function(k){
-    var p=k.split(":"), b=+p[0], c=+p[1], v=+p[2], e=m[k], text=verseText(b,c,v);
-    saved.push('<button class="saved-row" data-jumpverse="'+b+':'+c+':'+v+'">'+
-      '<span class="item-ref">'+(e.hl?'<i class="dot" style="background:var(--hl-'+e.hl+')"></i>':'')+
-        esc(refOf(b,c,v))+'</span>'+
-      (text?'<span class="item-tx">'+esc(text)+'</span>':'')+
-      (e.note?'<span class="item-note">'+esc(e.note)+'</span>':'')+
-      '</button>');
-  });
-
-
-  return saved.length ? saved.join("") :
-    emptyBox("NOTHING SAVED YET","Highlights and Bible notes will collect here.");
 }
 
 /* ============================================================
@@ -1725,7 +1735,7 @@ function settingsView(){
   }).join('');
 
   return '<div class="pad settings-page">'+
-    '<button class="backlink" data-appback="1">&#8249; BACK</button>'+
+    (state.settingsPrimary?'':'<button class="backlink" data-appback="1">&#8249; BACK</button>')+
     screenHead("Settings","Appearance, Bible library, and local data")+
     '<div class="grouphd">APP THEME</div>'+
     '<div class="theme-grid">'+THEMES.map(function(t){ return '<button class="theme-card'+(active===t.id?' on':'')+'" data-themeopt="'+t.id+'">'+
@@ -1741,9 +1751,8 @@ function settingsView(){
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
     '<div class="setrow"><div><div class="lbl">Highlights &amp; verse categories</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Notes library</div><div class="sub">'+nstats.docs+' saved notes · '+nstats.prayers+' prayer requests · '+nstats.chars.toLocaleString()+' characters</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, Scripture categories, highlights, M’Cheyne setup and progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Activity history</div><div class="sub">'+activity().length+' recent actions saved on this device.</div></div><button class="mini" data-clearhistory="1">CLEAR</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, Scripture categories, highlights, M’Cheyne setup and progress, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
     '<div class="foot">BIBLE TEXT DOWNLOADS AND YOUR READING DATA STAY ON THIS DEVICE</div></div>';
 }
 
@@ -1785,12 +1794,12 @@ var TABS=[
   {id:"podcast", label:"PODCAST"},
   {id:"bible", label:"BIBLE"},
   {id:"notes", label:"NOTES"},
-  {id:"history", label:"HISTORY"}
+  {id:"settings", label:"SETTINGS"}
 ];
 
 function backAvailable(){
   if(state.reminderTarget) return true;
-  if(state.tab==="settings" || state.tab==="card") return true;
+  if((state.tab==="settings" && !state.settingsPrimary) || state.tab==="card") return true;
   if(state.tab==="devotion" && state.devMode==="plan") return true;
   if(state.tab==="bible" && (state.bview!=="read" || state.categoryOpen)) return true;
   if(state.tab==="notes" && (state.noteId || state.prayerId || state.prayerComposer)) return true;
@@ -1805,7 +1814,7 @@ function appBack(){
   if(state.tab==="bible" && state.bview!=="read"){ state.bview="read"; state.sel=null; render(); return; }
   if(state.tab==="devotion" && state.devMode==="plan"){ state.devMode="today"; render(); return; }
   if(state.tab==="card"){ state.tab=state.returnTab||"bible"; render(); return; }
-  if(state.tab==="settings"){ state.tab=state.returnTab||"devotion"; render(); return; }
+  if(state.tab==="settings"){ state.settingsPrimary=false; state.tab=state.returnTab||"devotion"; render(); return; }
 }
 
 function screenHTML(){
@@ -1814,7 +1823,6 @@ function screenHTML(){
     case "podcast":  return podcastView();
     case "bible":    return bibleView();
     case "notes":    return notesView();
-    case "history":  return historyView();
     case "card":     return cardView();
     case "settings": return settingsView();
     default:         return devotionView();
@@ -1835,8 +1843,7 @@ function render(){
 
   [].forEach.call(document.querySelectorAll("nav button"),function(b){
     var on = b.dataset.tab===state.tab ||
-             (state.tab==="card" && b.dataset.tab==="bible") ||
-             (state.tab==="settings" && b.dataset.tab==="bible");
+             (state.tab==="card" && b.dataset.tab==="bible");
     b.classList.toggle("on", on);
   });
 
@@ -1856,7 +1863,7 @@ function wire(scr){
   on(scr,"[data-go]",function(b){
     b.onclick=function(){
       var next=b.dataset.go;
-      if(next==="settings") state.returnTab=state.tab;
+      if(next==="settings"){ state.returnTab=state.tab; state.settingsPrimary=false; } else { state.settingsPrimary=false; }
       if(state.tab==="notes" && next!=="notes") saveOpenNote();
       state.tab=next;
       if(next!=="notes"){ state.noteId=null; state.notePreview=false; }
@@ -1972,10 +1979,16 @@ function wire(scr){
     };
   }
 
-  // History
-  on(scr,"[data-history]",function(b){
-    b.onclick=function(){ state.historyTab=b.dataset.history; render(); };
-  });
+  var attachmentInput=scr.querySelector('[data-attachfile]');
+  if(attachmentInput) attachmentInput.onchange=function(){
+    var target=currentAttachmentTarget(), files=attachmentInput.files;
+    saveOpenNote();
+    saveAttachmentFiles(target,files).then(function(){ render(); });
+  };
+  on(scr,"[data-attachlink]",function(b){ b.onclick=function(){ var target=currentAttachmentTarget(), inp=$("attachmentLinkInput"); saveOpenNote(); if(addLinkAttachment(target,inp?inp.value:"")) render(); }; });
+  on(scr,"[data-attachopen]",function(b){ b.onclick=function(){ openAttachment(currentAttachmentTarget(),b.dataset.attachopen); }; });
+  on(scr,"[data-attachremove]",function(b){ b.onclick=function(){ removeAttachment(currentAttachmentTarget(),b.dataset.attachremove); toast("Attachment removed"); render(); }; });
+
   on(scr,"[data-notesection]",function(b){
     b.onclick=function(){ saveOpenNote(); state.prayerComposer=false; state.prayerId=null; state.prayerDraft=""; state.prayerDraftCategory="Personal"; state.noteSection=b.dataset.notesection; state.noteId=null; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
   });
@@ -2084,13 +2097,6 @@ function wire(scr){
       enablePodcastReminder().then(function(){ toast("Episode reminder is on"); render(); }).catch(function(err){ toast(err.message||"Could not turn on the episode reminder"); render(); });
     };
   });
-  on(scr,"[data-clearhistory]",function(b){
-    b.onclick=function(){
-      jset("activity",[]);
-      toast("Activity history cleared");
-      render();
-    };
-  });
 
   // Legacy saved-list wiring
   on(scr,"[data-list]",function(b){
@@ -2184,7 +2190,7 @@ function wire(scr){
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), mcheynePlanSettings:planSettings(), plandone:planDone(), activity:activity().filter(function(a){return a.type!=="bookmark";}), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
+      var data={ marks:marks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), mcheynePlanSettings:planSettings(), plandone:planDone(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -2197,7 +2203,10 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("mcheynePlanSettings",defaultPlanSettings()); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:""});
+        var wipeLib=noteLibrary();
+        ["sermon","study","men"].forEach(function(k){ (wipeLib.docs[k]||[]).forEach(function(d){ cleanupAttachments(d.attachments); }); });
+        (wipeLib.prayers||[]).forEach(function(pr){ cleanupAttachments(pr.attachments); });
+        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("mcheynePlanSettings",defaultPlanSettings()); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:""});
         ls("streak","0"); ls("lastWalk","");
         Promise.all(TIERS.filter(function(t){return t.available;}).map(function(t){ return removeTier(t.id); }))
           .then(function(){ state.meta={}; state.loaded={}; state.tab="devotion"; toast("Everything cleared"); render(); });
@@ -2468,20 +2477,23 @@ if(window.matchMedia){
 [].forEach.call(document.querySelectorAll("nav button"),function(b){
   b.onclick=function(){
     if(state.tab==="notes") saveOpenNote();
-    state.tab=b.dataset.tab;
-    state.returnTab=state.tab;
+    var next=b.dataset.tab;
+    if(next==="settings"){
+      if(state.tab!=="settings") state.returnTab=state.tab;
+      state.settingsPrimary=true; state.tab="settings";
+    }else{
+      state.settingsPrimary=false; state.tab=next; state.returnTab=state.tab;
+    }
     if(state.tab==="bible") state.bview="read";
     if(state.tab!=="notes"){ state.noteId=null; state.notePreview=false; state.prayerId=null; state.prayerComposer=false; state.prayerDraft=""; state.prayerDraftCategory="Personal"; }
-    if(state.tab==="podcast") logActivity("podcast","The Applied Word Podcast","Podcast tab");
     render();
   };
 });
 
 var globalBack=$("globalBack");
 if(globalBack) globalBack.onclick=appBack;
-var settingsBtn=$("settingsBtn");
-if(settingsBtn) settingsBtn.onclick=function(){ if(state.tab==="notes") saveOpenNote(); state.returnTab=state.tab; state.tab="settings"; render(); };
 
+try{ localStorage.removeItem("activity"); }catch(e){}
 applyTheme();
 initSheet();
 initCategoryPicker();
