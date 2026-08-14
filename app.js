@@ -195,17 +195,6 @@ function setMark(b,c,v,patch){
   if(!cur.hl && !cur.note) delete m[k]; else { cur.at=Date.now(); m[k]=cur; }
   jset("marks",m);
 }
-function bookmarks(){ return jget("bookmarks",[]); }
-function isBookmarked(b,c){
-  return bookmarks().some(function(x){ return x.b===b && x.c===c; });
-}
-function toggleBookmark(b,c){
-  var list=bookmarks(), i=-1;
-  list.forEach(function(x,ix){ if(x.b===b&&x.c===c) i=ix; });
-  if(i>-1){ list.splice(i,1); jset("bookmarks",list); return false; }
-  list.unshift({b:b,c:c,at:Date.now()}); jset("bookmarks",list); return true;
-}
-
 /* ---------- notes library ---------- */
 var NOTE_SECTIONS=[
   {id:"sermon", label:"SERMON NOTES", short:"SERMON", hint:"Capture key points, verses, and takeaways from a sermon.", kind:"document"},
@@ -631,24 +620,8 @@ function applyRichTextAction(action){
   saveOpenNote();
 }
 
-/* ---------- verse bookmarks + categories ---------- */
-function verseBookmarks(){ return jget("verseBookmarks",[]); }
+/* ---------- verse categories ---------- */
 function verseKey(b,c,v){ return b+":"+c+":"+v; }
-function isVerseBookmarked(b,c,v){
-  var key=verseKey(b,c,v);
-  return verseBookmarks().indexOf(key)>-1;
-}
-function toggleVerseBookmarks(b,c,vs){
-  var list=verseBookmarks(), keys=(vs||[]).map(function(v){return verseKey(b,c,v);}), added=0, removed=0;
-  var allSaved=keys.length && keys.every(function(k){return list.indexOf(k)>-1;});
-  if(allSaved){
-    keys.forEach(function(k){ var at=list.indexOf(k); if(at>-1){ list.splice(at,1); removed++; } });
-  } else {
-    keys.forEach(function(k){ if(list.indexOf(k)<0){ list.push(k); added++; } });
-  }
-  jset("verseBookmarks",list);
-  return {added:added,removed:removed};
-}
 function categories(){ return jget("verseCategories",[]); }
 function saveCategories(list){ jset("verseCategories",list||[]); }
 function newCategoryId(){ return "cat-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7); }
@@ -687,8 +660,8 @@ function categoryNamesForVerse(b,c,v){
 }
 function categoryChipHTML(b,c,v){
   var names=categoryNamesForVerse(b,c,v);
-  if(!names.length && !isVerseBookmarked(b,c,v)) return '';
-  return '<div class="verse-tags">'+(isVerseBookmarked(b,c,v)?'<span class="verse-tag bookmark">★</span>':'')+
+  if(!names.length) return '';
+  return '<div class="verse-tags">'+
     names.slice(0,2).map(function(n){return '<span class="verse-tag">'+esc(n)+'</span>';}).join('')+
     (names.length>2?'<span class="verse-tag">+'+(names.length-2)+'</span>':'')+'</div>';
 }
@@ -712,7 +685,6 @@ function selectionActionBar(){
       '<button data-selact="highlight"><span>▰</span>HIGHLIGHT</button>'+
       '<button data-selact="copy"><span>⧉</span>COPY</button>'+
       '<button data-selact="card"><span>□</span>CARD</button>'+
-      '<button data-selact="bookmark"><span>★</span>BOOKMARK</button>'+
       '<button data-selact="category"><span>⊕</span>CATEGORY</button>'+
       '<button data-selact="note"><span>✎</span>NOTE</button>'+
     '</div></div>';
@@ -771,12 +743,12 @@ function recordChapterRead(b,c){
 }
 function activityIcon(type){
   return {walk:"✦",read:"▤",highlight:"●",note:"✎",share:"↗",card:"□",
-    bookmark:"★",category:"⊕",podcast:"▶",download:"⇩",plan:"✓"}[type] || "•";
+    category:"⊕",podcast:"▶",download:"⇩",plan:"✓"}[type] || "•";
 }
 function activityLabel(type){
   return {walk:"Devotional completed",read:"Read Scripture",highlight:"Highlighted verse",
     note:"Added a note",share:"Shared a verse",card:"Created a verse card",
-    bookmark:"Bookmarked Scripture",category:"Added verse category",podcast:"Opened podcast",download:"Downloaded Bible",
+    category:"Added verse category",podcast:"Opened podcast",download:"Downloaded Bible",
     plan:"Completed plan reading"}[type] || "Activity";
 }
 
@@ -1137,7 +1109,7 @@ function plansView(){
     screenHead("Reading Plan","M’Cheyne · "+planDurationLabel(setup.duration))+
     '<div class="tabsel devotion-tabs devotion-switch"><button data-dev="today">TODAY</button><button class="on" data-dev="plan">READING PLAN</button></div>'+
     '<div class="content-card plan-setup-card"><div class="plan-setup-head"><div><div class="content-kicker">YOUR PLAN</div><b>'+stats.days+' DAYS COMPLETED</b><small>'+stats.readings+' OF '+stats.totalReadings+' READINGS</small></div><button class="mini" data-plantoday="1">TODAY</button></div>'+
-      '<div class="plan-setup-grid"><label>START DATE<input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label>PLAN<select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year · 4 readings/day</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Month · 8 readings/day</option></select></label></div>'+
+      '<div class="plan-setup-grid"><label>START DATE<input type="date" id="planStartDate" value="'+esc(setup.startDate)+'"></label><label>PLAN<select id="planDuration"><option value="year"'+(setup.duration==='year'?' selected':'')+'>1 Year</option><option value="sixmonth"'+(setup.duration==='sixmonth'?' selected':'')+'>6 Months</option></select></label></div>'+
       '<div class="plan-reminder-row"><label class="toggle-row"><input type="checkbox" id="planReminderEnabled"'+(setup.reminderEnabled?' checked':'')+'><span></span><b>Reading reminder</b></label><label class="plan-reminder-time-label">TIME<input type="time" id="planReminderTime" value="'+esc(setup.reminderTime)+'"></label></div>'+
       '<p>The 1 Year plan follows one M’Cheyne calendar day each day. The 6 Month plan combines two consecutive M’Cheyne days so the same reading schedule is completed in about half the time.</p></div>'+
     '<div class="plan-date-nav"><button class="mini" data-plandate="-1" aria-label="Previous reading day">‹</button><label><span>READING DATE</span><input type="date" id="planDate" value="'+state.planDate+'"></label><button class="mini" data-plandate="1" aria-label="Next reading day">›</button></div>'+body+
@@ -1173,7 +1145,6 @@ function bibleView(){
       versionSelectHTML()+'<div class="loading"><i></i>OPENING '+esc(BOOKS[state.book]).toUpperCase()+'</div></div>';
   }
 
-  var marked=isBookmarked(state.book,state.chapter);
   var selected=selectedVerseList();
   var rows=verses.map(function(pair){
     var v=pair[0], text=pair[1];
@@ -1196,14 +1167,13 @@ function bibleView(){
       '<button data-bview="categories" aria-label="Verse categories">CATEGORIES</button>'+
       '<button data-font="-1" aria-label="Decrease text size">A−</button>'+
       '<button data-font="1" aria-label="Increase text size">A+</button>'+
-      '<button data-mark="1" aria-label="Bookmark chapter">'+(marked?'★':'☆')+'</button>'+
     '</div>'+
     '<div class="chapter-title">'+esc(BOOKS[state.book])+' '+state.chapter+'</div>'+
     '<div class="chapter-sub">'+esc((state.meta[state.version]||{}).abbr||"")+
-      ' · '+verses.length+' VERSES'+(marked?' · CHAPTER BOOKMARKED':'')+'</div>'+
+      ' · '+verses.length+' VERSES</div>'+
     '<div class="reader-shell"><div class="reader-body" style="--reader-scale:'+state.fontScale+'">'+rows+'</div></div>'+
     '<div class="reader-end"><button class="cta ghost" data-step="1">NEXT CHAPTER &#8250;</button></div>'+
-    '<div class="foot">TAP VERSES TO SELECT · THEN HIGHLIGHT, COPY, CARD, BOOKMARK, OR CATEGORIZE</div>'+selectionActionBar()+'</div>';
+    '<div class="foot">TAP VERSES TO SELECT · THEN HIGHLIGHT, COPY, CARD, NOTE, OR CATEGORIZE</div>'+selectionActionBar()+'</div>';
 }
 
 function bibleSearchView(){
@@ -1362,20 +1332,12 @@ function closeSheet(){
 }
 
 /* ============================================================
-   HIGHLIGHTS / NOTES / BOOKMARKS
+   HIGHLIGHTS / NOTES
    ============================================================ */
 function listView(){
-  var t=state.listTab;
+  var t=state.listTab==="notes"?"notes":"highlights";
   var rows="";
-
-  if(t==="bookmarks"){
-    var bm=bookmarks();
-    rows=bm.length ? bm.map(function(x){
-      return '<div class="item" data-jump="'+x.b+":"+x.c+'">'+
-        '<div class="item-ref">&#9733; '+esc(refOf(x.b,x.c))+'</div></div>';
-    }).join("") : "";
-    if(!rows) rows=emptyBox("NO BOOKMARKS YET","Open a chapter and tap Bookmark to keep your place.");
-  } else {
+  {
     var m=marks();
     var keys=Object.keys(m).filter(function(k){
       return t==="highlights" ? !!m[k].hl : !!m[k].note;
@@ -1406,7 +1368,6 @@ function listView(){
     '<div class="tabsel">'+
       '<button class="'+(t==="highlights"?"on":"")+'" data-list="highlights">HIGHLIGHTS</button>'+
       '<button class="'+(t==="notes"?"on":"")+'" data-list="notes">NOTES</button>'+
-      '<button class="'+(t==="bookmarks"?"on":"")+'" data-list="bookmarks">BOOKMARKS</button>'+
     '</div><div style="margin-top:10px">'+rows+'</div></div>';
 }
 function notesTabsHTML(){
@@ -1549,7 +1510,6 @@ function historyView(){
       '<div><b>'+getStreak()+'</b><span>STREAK</span></div>'+
       '<div><b>'+hlN+'</b><span>HIGHLIGHTS</span></div>'+
       '<div><b>'+noteN+'</b><span>NOTES</span></div>'+
-      '<div><b>'+(bookmarks().length+verseBookmarks().length)+'</b><span>BOOKMARKS</span></div>'+
     '</div>'+
     '<div class="tabsel">'+
       '<button class="'+(t==="activity"?"on":"")+'" data-history="activity">ACTIVITY</button>'+
@@ -1561,7 +1521,7 @@ function historyView(){
 }
 
 function activityRows(){
-  var rows=activity();
+  var rows=activity().filter(function(a){return a.type!=="bookmark";});
   if(!rows.length) return emptyBox("NO ACTIVITY YET","As you read, highlight, take notes, share verses, and complete devotions, your recent activity will appear here.");
   return '<div class="timeline">'+rows.map(function(a){
     var d=new Date(a.at);
@@ -1596,20 +1556,9 @@ function savedHistoryRows(){
       '</button>');
   });
 
-  bookmarks().forEach(function(x){
-    saved.push('<button class="saved-row bookmark-row" data-jumpverse="'+x.b+':'+x.c+':1">'+
-      '<span class="item-ref">★ '+esc(refOf(x.b,x.c))+'</span>'+
-      '<span class="item-tx">Bookmarked chapter</span></button>');
-  });
-  verseBookmarks().forEach(function(key){
-    var p=key.split(":"), b=+p[0], c=+p[1], v=+p[2], text=verseText(b,c,v);
-    saved.push('<button class="saved-row bookmark-row" data-jumpverse="'+b+':'+c+':'+v+'">'+
-      '<span class="item-ref">★ '+esc(refOf(b,c,v))+'</span>'+
-      (text?'<span class="item-tx">'+esc(text)+'</span>':'<span class="item-tx">Bookmarked verse</span>')+'</button>');
-  });
 
   return saved.length ? saved.join("") :
-    emptyBox("NOTHING SAVED YET","Highlights, notes, and chapter bookmarks will collect here.");
+    emptyBox("NOTHING SAVED YET","Highlights and Bible notes will collect here.");
 }
 
 /* ============================================================
@@ -1753,7 +1702,6 @@ function settingsView(){
   var active=getTheme().id;
   var nstats=noteStats();
   var catCount=categories().length;
-  var vbCount=verseBookmarks().length;
   var nprefs=notificationPrefs();
   var bibleCards=TIERS.filter(function(t){return t.available;}).map(function(t){
     var m=state.meta[t.id], current=state.version===t.id;
@@ -1784,11 +1732,11 @@ function settingsView(){
     '<div class="grouphd settings-section-head">READING PLAN</div>'+
     '<div class="setrow"><div><div class="lbl">M’Cheyne progress</div><div class="sub">'+planProgressStats().days+' days completed · starts '+esc(planSettings().startDate)+' · '+esc(planDurationLabel(planSettings().duration))+'</div></div><button class="mini danger" data-planreset="1">RESET PLAN</button></div>'+
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
-    '<div class="setrow"><div><div class="lbl">Highlights &amp; saved Scripture</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' chapter bookmarks · '+vbCount+' verse bookmarks · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Highlights &amp; verse categories</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Notes library</div><div class="sub">'+nstats.docs+' saved notes · '+nstats.prayers+' prayer requests · '+nstats.chars.toLocaleString()+' characters</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, Scripture categories, bookmarks, highlights, M’Cheyne setup and progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, Scripture categories, highlights, M’Cheyne setup and progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
     '<div class="setrow"><div><div class="lbl">Activity history</div><div class="sub">'+activity().length+' recent actions saved on this device.</div></div><button class="mini" data-clearhistory="1">CLEAR</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, bookmarks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
     '<div class="foot">BIBLE TEXT DOWNLOADS AND YOUR READING DATA STAY ON THIS DEVICE</div></div>';
 }
 
@@ -1868,6 +1816,7 @@ function screenHTML(){
 
 function render(){
   applyTheme();
+  document.body.classList.toggle("reminder-open",!!state.reminderTarget);
   var back=$("globalBack"); if(back) back.hidden=!backAvailable();
   var scr=$("screen");
   var keepScroll=(state.tab==="bible" && state.bview==="read") ? scr.scrollTop : 0;
@@ -1971,13 +1920,6 @@ function wire(scr){
     b.onclick=function(){
       state.fontScale=Math.max(.85,Math.min(1.35,state.fontScale+(+b.dataset.font*.1)));
       ls("fontScale",state.fontScale.toFixed(2)); render();
-    };
-  });
-  on(scr,"[data-mark]",function(b){
-    b.onclick=function(){
-      var added=toggleBookmark(state.book,state.chapter);
-      if(added) logActivity("bookmark",refOf(state.book,state.chapter),"Chapter bookmark");
-      toast(added?"Bookmarked":"Bookmark removed"); render();
     };
   });
   on(scr,"[data-jump]",function(b){
@@ -2112,13 +2054,11 @@ function wire(scr){
         var out=rangeOutput(state.sel.b,state.sel.c,vs);
         if(navigator.clipboard) navigator.clipboard.writeText(out).then(function(){ logActivity("share",ref,"Copied verse selection"); toast("Copied"); });
         else toast("Copy isn't available here");
-        return;
+        state.sel=null; render(); return;
       }
-      if(act==="card"){ openCardForRange(state.sel.b,state.sel.c,vs); return; }
-      if(act==="bookmark"){
-        var r=toggleVerseBookmarks(state.sel.b,state.sel.c,vs);
-        if(r.added) logActivity("bookmark",ref,"Verse bookmark");
-        toast(r.added ? (r.added+" bookmarked") : "Bookmarks removed"); render(); return;
+      if(act==="card"){
+        var sb=state.sel.b, sc=state.sel.c, sv=vs.slice();
+        state.sel=null; openCardForRange(sb,sc,sv); return;
       }
       if(act==="category"){ openCategoryPicker(); return; }
     };
@@ -2185,7 +2125,7 @@ function wire(scr){
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), mcheynePlanSettings:planSettings(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
+      var data={ marks:marks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), mcheynePlanSettings:planSettings(), plandone:planDone(), activity:activity().filter(function(a){return a.type!=="bookmark";}), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -2281,7 +2221,7 @@ function initSheet(){
       var next=(allSame?null:c);
       vs.forEach(function(v){ setMark(state.sel.b,state.sel.c,v,{hl:next}); });
       if(next) logActivity("highlight",rangeRef(state.sel.b,state.sel.c,vs),next+" highlight");
-      render(); refreshSheetSelection();
+      state.sel=null; closeSheet(); render();
     };
   });
 
@@ -2295,21 +2235,23 @@ function initSheet(){
     var s=state.sel, vs=selectedVerseList(), val=$("sheetNote").value.trim();
     vs.forEach(function(v){ setMark(s.b,s.c,v,{note:val||null}); });
     if(val) logActivity("note",rangeRef(s.b,s.c,vs),"Bible note");
-    render(); refreshSheetSelection();
+    state.sel=null; closeSheet(); render();
   };
   $("sheetShareBtn").onclick=function(){
     if(!state.sel) return;
-    shareRange(state.sel.b,state.sel.c,selectedVerseList());
+    var b=state.sel.b,c=state.sel.c,vs=selectedVerseList();
+    shareRange(b,c,vs); state.sel=null; closeSheet(); render();
   };
   $("sheetCardBtn").onclick=function(){
     if(!state.sel) return;
-    var s=state.sel, vs=selectedVerseList(); closeSheet(); openCardForRange(s.b,s.c,vs);
+    var s=state.sel, vs=selectedVerseList(); state.sel=null; closeSheet(); openCardForRange(s.b,s.c,vs);
   };
   $("sheetCopyBtn").onclick=function(){
     if(!state.sel) return;
     var out=rangeOutput(state.sel.b,state.sel.c,selectedVerseList());
     if(navigator.clipboard) navigator.clipboard.writeText(out).then(function(){ toast("Copied"); });
     else toast("Copy isn't available here");
+    state.sel=null; closeSheet(); render();
   };
 }
 
@@ -2325,7 +2267,7 @@ function initCategoryPicker(){
     var cat=categoryById(b.dataset.categoryapply);
     if(added) logActivity("category",rangeRef(state.sel.b,state.sel.c,selectedVerseList()),cat?cat.name:"Category");
     toast(added ? "Added to "+(cat?cat.name:"category") : "Already in that category");
-    closeCategoryPicker(); render();
+    state.sel=null; closeCategoryPicker(); render();
   };
   create.onclick=function(){
     if(!state.sel) return;
@@ -2333,7 +2275,7 @@ function initCategoryPicker(){
     if(!cat){ toast("Enter a category name"); return; }
     var added=addSelectionToCategory(cat.id,state.sel.b,state.sel.c,selectedVerseList());
     if(added) logActivity("category",rangeRef(state.sel.b,state.sel.c,selectedVerseList()),cat.name);
-    toast("Added to "+cat.name); closeCategoryPicker(); render();
+    toast("Added to "+cat.name); state.sel=null; closeCategoryPicker(); render();
   };
   input.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); create.click(); } };
 }
