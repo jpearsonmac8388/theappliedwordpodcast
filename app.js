@@ -6,8 +6,11 @@ var SHOW_URL  = "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG";
 var EMBED_URL = "https://open.spotify.com/embed/show/75QaXUSGooCOG8oqKhuNmG?utm_source=generator&theme=0";
 var THEMES = [
   {id:"classic", name:"Classic", meta:"Leather & gold"},
-  {id:"midnight", name:"Blue Midnight", meta:"Lightweight navy minimal"},
-  {id:"slate", name:"Slate", meta:"Clean graphite slate"}
+  {id:"midnight", name:"Blue Midnight", meta:"Deep navy minimal"},
+  {id:"slate", name:"Slate", meta:"Cool graphite slate"},
+  {id:"forest", name:"Evergreen", meta:"Pacific Northwest green"},
+  {id:"graphite", name:"Graphite", meta:"Neutral black & steel"},
+  {id:"sandstone", name:"Sandstone", meta:"Warm light neutral"}
 ];
 var HERO_IMAGES = [
   "assets/hero-armor-belt.jpg",
@@ -58,7 +61,7 @@ function applyTheme(){
   var id=(state && state.theme) || ls("theme") || "classic";
   document.body.setAttribute("data-theme", id);
   var meta=document.querySelector('meta[name="theme-color"]');
-  var colors={classic:'#1B1510', midnight:'#0f1a2a', slate:'#1a232e'};
+  var colors={classic:'#1B1510', midnight:'#0d1726', slate:'#18212b', forest:'#10221c', graphite:'#14171b', sandstone:'#ebe2d2'};
   if(meta) meta.setAttribute('content', colors[id] || colors.classic);
 }
 function baseHeroIndex(){ return (dayOfYear(today())-1) % HERO_IMAGES.length; }
@@ -99,7 +102,9 @@ function selectedVerseList(){
 function rangeRef(b,c,vs){
   vs=(vs||[]).slice().sort(function(a,b){return a-b;});
   if(!vs.length) return refOf(b,c);
-  return BOOKS[b]+" "+c+":"+vs[0]+(vs.length>1?"–"+vs[vs.length-1]:"");
+  if(vs.length===1) return BOOKS[b]+" "+c+":"+vs[0];
+  var consecutive=vs.every(function(v,i){ return i===0 || v===vs[i-1]+1; });
+  return BOOKS[b]+" "+c+":"+(consecutive ? vs[0]+"–"+vs[vs.length-1] : vs.join(","));
 }
 function rangeText(b,c,vs,withNumbers){
   vs=(vs||[]).slice().sort(function(a,b){return a-b;});
@@ -156,7 +161,8 @@ var state = {
   cardRatio: "9:16", cardVerse: null,
   // notes
   noteSection: ls("noteSection") || "sermon",
-  notePreview: false
+  notePreview: false,
+  categoryOpen: null
 };
 
 /* ---------- user marks ---------- */
@@ -252,6 +258,120 @@ function applyMarkdownAction(action){
   saveNoteValue(state.noteSection, ta.value);
 }
 
+
+/* ---------- verse bookmarks + categories ---------- */
+function verseBookmarks(){ return jget("verseBookmarks",[]); }
+function verseKey(b,c,v){ return b+":"+c+":"+v; }
+function isVerseBookmarked(b,c,v){
+  var key=verseKey(b,c,v);
+  return verseBookmarks().indexOf(key)>-1;
+}
+function toggleVerseBookmarks(b,c,vs){
+  var list=verseBookmarks(), keys=(vs||[]).map(function(v){return verseKey(b,c,v);}), added=0, removed=0;
+  var allSaved=keys.length && keys.every(function(k){return list.indexOf(k)>-1;});
+  if(allSaved){
+    keys.forEach(function(k){ var at=list.indexOf(k); if(at>-1){ list.splice(at,1); removed++; } });
+  } else {
+    keys.forEach(function(k){ if(list.indexOf(k)<0){ list.push(k); added++; } });
+  }
+  jset("verseBookmarks",list);
+  return {added:added,removed:removed};
+}
+function categories(){ return jget("verseCategories",[]); }
+function saveCategories(list){ jset("verseCategories",list||[]); }
+function newCategoryId(){ return "cat-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7); }
+function createCategory(name){
+  name=String(name||"").trim();
+  if(!name) return null;
+  var list=categories();
+  var existing=list.find(function(c){ return c.name.toLowerCase()===name.toLowerCase(); });
+  if(existing) return existing;
+  var cat={id:newCategoryId(),name:name,verses:[],createdAt:Date.now()};
+  list.push(cat); saveCategories(list); return cat;
+}
+function categoryById(id){ return categories().find(function(c){ return c.id===id; }) || null; }
+function addSelectionToCategory(id,b,c,vs){
+  var list=categories(), cat=list.find(function(x){return x.id===id;});
+  if(!cat) return 0;
+  cat.verses=cat.verses||[];
+  var added=0;
+  (vs||[]).forEach(function(v){ var k=verseKey(b,c,v); if(cat.verses.indexOf(k)<0){ cat.verses.push(k); added++; } });
+  saveCategories(list); return added;
+}
+function removeVerseFromCategory(id,key){
+  var list=categories(), cat=list.find(function(x){return x.id===id;});
+  if(!cat) return;
+  cat.verses=(cat.verses||[]).filter(function(k){ return k!==key; }); saveCategories(list);
+}
+function deleteCategory(id){ saveCategories(categories().filter(function(c){return c.id!==id;})); }
+function renameCategory(id,name){
+  name=String(name||"").trim(); if(!name) return;
+  var list=categories(), cat=list.find(function(c){return c.id===id;}); if(!cat) return;
+  cat.name=name; saveCategories(list);
+}
+function categoryNamesForVerse(b,c,v){
+  var key=verseKey(b,c,v);
+  return categories().filter(function(cat){return (cat.verses||[]).indexOf(key)>-1;}).map(function(cat){return cat.name;});
+}
+function categoryChipHTML(b,c,v){
+  var names=categoryNamesForVerse(b,c,v);
+  if(!names.length && !isVerseBookmarked(b,c,v)) return '';
+  return '<div class="verse-tags">'+(isVerseBookmarked(b,c,v)?'<span class="verse-tag bookmark">★</span>':'')+
+    names.slice(0,2).map(function(n){return '<span class="verse-tag">'+esc(n)+'</span>';}).join('')+
+    (names.length>2?'<span class="verse-tag">+'+(names.length-2)+'</span>':'')+'</div>';
+}
+function selectionCount(){ return selectedVerseList().length; }
+function clearVerseSelection(){ state.sel=null; render(); }
+function toggleVerseSelection(v){
+  var b=state.book,c=state.chapter;
+  if(!state.sel || state.sel.b!==b || state.sel.c!==c){ state.sel={b:b,c:c,v:v,vs:[v],anchor:v}; render(); return; }
+  var vs=selectedVerseList(), at=vs.indexOf(v);
+  if(at>-1) vs.splice(at,1); else vs.push(v);
+  vs.sort(function(a,b){return a-b;});
+  if(!vs.length){ state.sel=null; render(); return; }
+  state.sel.v=vs[0]; state.sel.vs=vs; render();
+}
+function selectionActionBar(){
+  if(!state.sel || state.sel.b!==state.book || state.sel.c!==state.chapter) return '';
+  var n=selectionCount();
+  return '<div class="verse-selection-bar">'+
+    '<div class="selection-summary"><b>'+n+(n===1?' VERSE':' VERSES')+'</b><span>'+esc(rangeRef(state.book,state.chapter,selectedVerseList()))+'</span><button data-selclear="1" aria-label="Clear verse selection">×</button></div>'+
+    '<div class="selection-actions">'+
+      '<button data-selact="highlight"><span>▰</span>HIGHLIGHT</button>'+
+      '<button data-selact="copy"><span>⧉</span>COPY</button>'+
+      '<button data-selact="card"><span>□</span>CARD</button>'+
+      '<button data-selact="bookmark"><span>★</span>BOOKMARK</button>'+
+      '<button data-selact="category"><span>⊕</span>CATEGORY</button>'+
+      '<button data-selact="note"><span>✎</span>NOTE</button>'+
+    '</div></div>';
+}
+function openCategoryPicker(){
+  if(!state.sel) return;
+  var overlay=$("categoryOverlay"), listEl=$("categoryList"), input=$("categoryName");
+  if(!overlay||!listEl||!input) return;
+  var cats=categories();
+  listEl.innerHTML=cats.length ? cats.map(function(cat){
+    return '<button class="category-pick" data-categoryapply="'+cat.id+'"><b>'+esc(cat.name)+'</b><span>'+(cat.verses||[]).length+' saved verse'+((cat.verses||[]).length===1?'':'s')+'</span></button>';
+  }).join('') : '<div class="category-empty">No categories yet. Create one below.</div>';
+  input.value=''; overlay.hidden=false; input.focus();
+}
+function closeCategoryPicker(){ var o=$("categoryOverlay"); if(o) o.hidden=true; }
+function categoryView(){
+  var cats=categories(), open=state.categoryOpen ? categoryById(state.categoryOpen) : null;
+  if(open){
+    var rows=(open.verses||[]).map(function(key){
+      var p=key.split(":"),b=+p[0],c=+p[1],v=+p[2],tx=verseText(b,c,v);
+      return '<div class="category-verse-row"><button data-jumpverse="'+b+':'+c+':'+v+'"><b>'+esc(refOf(b,c,v))+'</b><span>'+esc(tx||'Verse text available when this translation is installed.')+'</span></button><button class="category-remove" data-catremove="'+open.id+'|'+key+'" aria-label="Remove from category">×</button></div>';
+    }).join('');
+    return '<div class="pad categories-page"><button class="backlink" data-catback="1">‹ ALL CATEGORIES</button>'+screenHead(open.name,(open.verses||[]).length+' saved verses')+
+      '<div class="category-toolbar"><button class="mini" data-catrename="'+open.id+'">RENAME</button><button class="mini danger" data-catdelete="'+open.id+'">DELETE</button></div>'+
+      '<div class="category-verses">'+(rows||emptyBox("EMPTY CATEGORY","Select verses in the Bible reader and add them to this category."))+'</div></div>';
+  }
+  return '<div class="pad categories-page"><button class="backlink" data-bview="read">‹ BACK TO READER</button>'+screenHead("Verse Categories","Group verses into named collections")+
+    '<div class="category-create-row"><input id="categoryLibraryName" maxlength="60" placeholder="New category name"><button data-catcreate="1">CREATE</button></div>'+ 
+    '<div class="category-grid">'+(cats.length?cats.map(function(cat){return '<button class="category-card" data-catopen="'+cat.id+'"><span class="category-icon">⊕</span><b>'+esc(cat.name)+'</b><small>'+(cat.verses||[]).length+' VERSES</small></button>';}).join(''):emptyBox("NO CATEGORIES YET","Create a category, then select verses and add them to it."))+'</div></div>';
+}
+
 /* ---------- streak ---------- */
 function getStreak(){ return parseInt(ls("streak")||"0",10); }
 function walkedToday(){ return ls("lastWalk")===stampOf(today()); }
@@ -279,12 +399,12 @@ function recordChapterRead(b,c){
 }
 function activityIcon(type){
   return {walk:"✦",read:"▤",highlight:"●",note:"✎",share:"↗",card:"□",
-    bookmark:"★",podcast:"▶",download:"⇩",plan:"✓"}[type] || "•";
+    bookmark:"★",category:"⊕",podcast:"▶",download:"⇩",plan:"✓"}[type] || "•";
 }
 function activityLabel(type){
   return {walk:"Devotional completed",read:"Read Scripture",highlight:"Highlighted verse",
     note:"Added a note",share:"Shared a verse",card:"Created a verse card",
-    bookmark:"Bookmarked chapter",podcast:"Opened podcast",download:"Downloaded Bible",
+    bookmark:"Bookmarked Scripture",category:"Added verse category",podcast:"Opened podcast",download:"Downloaded Bible",
     plan:"Completed plan reading"}[type] || "Activity";
 }
 
@@ -305,6 +425,11 @@ function refOf(b,c,v){
 }
 function currentTier(){
   var t=null; TIERS.forEach(function(x){ if(x.id===state.version) t=x; }); return t;
+}
+function installedTiers(){ return TIERS.filter(function(t){ return !!state.meta[t.id]; }); }
+function versionSelectHTML(){
+  var list=installedTiers();
+  return '<div class="translation-row"><label for="versionSelect">TRANSLATION</label><select id="versionSelect">'+list.map(function(t){ return '<option value="'+t.id+'"'+(t.id===state.version?' selected':'')+'>'+esc(t.abbr)+' · '+esc(t.name)+'</option>'; }).join('')+'</select><button data-go="settings">MANAGE</button></div>';
 }
 
 function loadVersion(id){
@@ -661,59 +786,59 @@ function plansView(){
    ============================================================ */
 function bibleView(){
   if(!anyInstalled()){
-    return '<div class="pad">'+
-      screenHead("Bible","Complete offline BSB reader")+
-      '<div class="bible-install">'+
-        '<div class="install-crest">✦</div>'+
-        '<h3>BEREAN STANDARD BIBLE</h3>'+
-        '<p>The BSB text is included with the app. Download it once, then the full Bible is available offline with highlights, notes, bookmarks, search, sharing, and verse images.</p>'+
-        '<div class="bar" id="bar-bsb" style="display:none"><i></i></div>'+
-        '<button class="cta" data-dl="bsb">DOWNLOAD BSB</button>'+
-        '<div class="tier-meta">PUBLIC DOMAIN · 66 BOOKS · STORED ON THIS DEVICE</div>'+
-      '</div>'+
-      '<div class="foot">THE BEREAN STANDARD BIBLE · PUBLIC DOMAIN</div></div>';
+    return '<div class="pad bible-library-page">'+
+      screenHead("Bible Library","Download any public-domain translation for offline reading")+
+      '<div class="library-grid">'+TIERS.filter(function(t){return t.available;}).map(function(t){
+        return '<div class="library-card"><div class="library-abbr">'+esc(t.abbr)+'</div><div><h3>'+esc(t.name)+'</h3><p>'+esc(t.note||'')+'</p><small>'+esc(t.license||'Public Domain')+'</small></div><div class="bar" id="bar-'+t.id+'" style="display:none"><i></i></div><button class="cta" data-dl="'+t.id+'">DOWNLOAD '+esc(t.abbr)+'</button></div>';
+      }).join('')+'</div><div class="foot">BIBLE TEXT IS STORED LOCALLY AFTER DOWNLOAD</div></div>';
   }
 
+  if(!state.meta[state.version]){
+    var first=installedTiers()[0];
+    if(first){ state.version=first.id; ls("version",state.version); }
+  }
   if(state.bview==="books") return bookPicker();
   if(state.bview==="chapters") return chapterPicker();
   if(state.bview==="search") return bibleSearchView();
+  if(state.bview==="categories") return categoryView();
 
   var verses=chapterVerses(state.book,state.chapter);
   if(!verses){
     return '<div class="pad">'+screenHead("Bible",BOOKS[state.book])+
-      '<div class="loading"><i></i>OPENING '+esc(BOOKS[state.book]).toUpperCase()+'</div></div>';
+      versionSelectHTML()+'<div class="loading"><i></i>OPENING '+esc(BOOKS[state.book]).toUpperCase()+'</div></div>';
   }
 
   var marked=isBookmarked(state.book,state.chapter);
+  var selected=selectedVerseList();
   var rows=verses.map(function(pair){
     var v=pair[0], text=pair[1];
     var m=markFor(state.book,state.chapter,v);
-    return '<div class="v'+(state.sel&&selectedVerseList().indexOf(v)>-1?" sel":"")+'"'+
+    return '<div class="v'+(state.sel&&selected.indexOf(v)>-1?" sel":"")+'"'+
       (m&&m.hl?' data-hl="'+m.hl+'"':'')+' data-v="'+v+'">'+
       '<div class="v-no">'+v+'</div>'+
-      '<div class="v-tx"><span class="v-tx-inner">'+esc(text)+'</span></div>'+
+      '<div class="v-tx"><span class="v-tx-inner">'+esc(text)+'</span>'+categoryChipHTML(state.book,state.chapter,v)+'</div>'+
       (m&&m.note?'<div class="marks"><span title="note">&#9998;</span></div>':'')+
     '</div>';
   }).join("");
 
-  return '<div class="pad bible-page">'+
-    screenHead("Bible",(state.meta[state.version]||{}).name||"Berean Standard Bible")+
+  return '<div class="pad bible-page'+(state.sel?' has-selection':'')+'">'+
+    screenHead("Bible",(state.meta[state.version]||{}).name||"Bible")+
+    versionSelectHTML()+
     '<button class="reader-search-btn" data-bview="search">&#9906; SEARCH BIBLE</button>'+
     readBar()+
-    '<div class="reader-tools">'+
+    '<div class="reader-tools modern-tools">'+
       '<button data-bview="books" aria-label="Choose book">BOOKS</button>'+
+      '<button data-bview="categories" aria-label="Verse categories">CATEGORIES</button>'+
       '<button data-font="-1" aria-label="Decrease text size">A−</button>'+
       '<button data-font="1" aria-label="Increase text size">A+</button>'+
       '<button data-mark="1" aria-label="Bookmark chapter">'+(marked?'★':'☆')+'</button>'+
     '</div>'+
     '<div class="chapter-title">'+esc(BOOKS[state.book])+' '+state.chapter+'</div>'+
-    '<div class="chapter-sub">'+esc((state.meta[state.version]||{}).abbr||"BSB")+
-      ' · '+verses.length+' VERSES'+(marked?' · BOOKMARKED':'')+'</div>'+
+    '<div class="chapter-sub">'+esc((state.meta[state.version]||{}).abbr||"")+
+      ' · '+verses.length+' VERSES'+(marked?' · CHAPTER BOOKMARKED':'')+'</div>'+
     '<div class="reader-shell"><div class="reader-body" style="--reader-scale:'+state.fontScale+'">'+rows+'</div></div>'+
-    '<div class="reader-end">'+
-      '<button class="cta ghost" data-step="1">NEXT CHAPTER &#8250;</button>'+
-    '</div>'+
-    '<div class="foot">TAP ANY VERSE TO HIGHLIGHT, NOTE, SHARE, OR MAKE A CARD</div></div>';
+    '<div class="reader-end"><button class="cta ghost" data-step="1">NEXT CHAPTER &#8250;</button></div>'+
+    '<div class="foot">TAP VERSES TO SELECT · THEN HIGHLIGHT, COPY, CARD, BOOKMARK, OR CATEGORIZE</div>'+selectionActionBar()+'</div>';
 }
 
 function bibleSearchView(){
@@ -845,7 +970,8 @@ function refreshSheetSelection(){
   if(next) next.disabled=vs[vs.length-1]>=max;
 }
 function openSheet(v){
-  state.sel={b:state.book,c:state.chapter,v:v,vs:[v],anchor:v};
+  if(!state.sel && v){ state.sel={b:state.book,c:state.chapter,v:v,vs:[v],anchor:v}; }
+  if(!state.sel) return;
   $("scrim").style.display="block";
   $("sheet").style.display="block";
   refreshSheetSelection();
@@ -867,7 +993,6 @@ function resetSelection(){
 function closeSheet(){
   $("sheet").style.display="none";
   $("scrim").style.display="none";
-  state.sel=null;
   render();
 }
 
@@ -973,7 +1098,7 @@ function historyView(){
       '<div><b>'+getStreak()+'</b><span>STREAK</span></div>'+
       '<div><b>'+hlN+'</b><span>HIGHLIGHTS</span></div>'+
       '<div><b>'+noteN+'</b><span>NOTES</span></div>'+
-      '<div><b>'+bookmarks().length+'</b><span>BOOKMARKS</span></div>'+
+      '<div><b>'+(bookmarks().length+verseBookmarks().length)+'</b><span>BOOKMARKS</span></div>'+
     '</div>'+
     '<div class="tabsel">'+
       '<button class="'+(t==="activity"?"on":"")+'" data-history="activity">ACTIVITY</button>'+
@@ -1024,6 +1149,12 @@ function savedHistoryRows(){
     saved.push('<button class="saved-row bookmark-row" data-jumpverse="'+x.b+':'+x.c+':1">'+
       '<span class="item-ref">★ '+esc(refOf(x.b,x.c))+'</span>'+
       '<span class="item-tx">Bookmarked chapter</span></button>');
+  });
+  verseBookmarks().forEach(function(key){
+    var p=key.split(":"), b=+p[0], c=+p[1], v=+p[2], text=verseText(b,c,v);
+    saved.push('<button class="saved-row bookmark-row" data-jumpverse="'+b+':'+c+':'+v+'">'+
+      '<span class="item-ref">★ '+esc(refOf(b,c,v))+'</span>'+
+      (text?'<span class="item-tx">'+esc(text)+'</span>':'<span class="item-tx">Bookmarked verse</span>')+'</button>');
   });
 
   return saved.length ? saved.join("") :
@@ -1167,40 +1298,39 @@ function openCardFor(b,c,v){ openCardForRange(b,c,[v]); }
    SETTINGS
    ============================================================ */
 function settingsView(){
-  var tier=TIERS[0], m=state.meta.bsb, active=getTheme().id;
+  var active=getTheme().id;
+  var usedSections=NOTE_SECTIONS.filter(function(s){ return !!noteValue(s.id).trim(); }).length;
+  var catCount=categories().length;
+  var vbCount=verseBookmarks().length;
+  var bibleCards=TIERS.filter(function(t){return t.available;}).map(function(t){
+    var m=state.meta[t.id], current=state.version===t.id;
+    return '<div class="tier modern-tier">'+
+      '<div class="tier-top"><div class="tier-label">'+esc(t.abbr)+' · OFFLINE BIBLE</div><div class="tier-badge'+(m?' in':'')+'">'+(m?(current?'IN USE':'INSTALLED'):'AVAILABLE')+'</div></div>'+
+      '<div class="tier-name">'+esc(t.name)+'</div>'+
+      '<div class="tier-note">'+esc(t.note||'')+'</div>'+
+      '<div class="tier-license">'+esc(t.license||'Public Domain')+'</div>'+
+      '<div class="bar" id="bar-'+t.id+'" style="display:none"><i></i></div>'+
+      (m
+        ? '<div class="tier-actions">'+(current?'':'<button class="tier-btn compact" data-use="'+t.id+'">USE '+esc(t.abbr)+'</button>')+'<button class="tier-btn compact ghost" data-drop="'+t.id+'">REMOVE</button></div><div class="tier-meta">'+m.verses.toLocaleString()+' VERSES · '+m.books+' BOOKS</div>'
+        : '<button class="tier-btn" data-dl="'+t.id+'">DOWNLOAD '+esc(t.abbr)+'</button>')+
+    '</div>';
+  }).join('');
+
   return '<div class="pad settings-page">'+
     '<button class="backlink" data-go="'+(anyInstalled()?'bible':'devotion')+'">&#8249; BACK</button>'+
-    '<div class="eyebrow">App &amp; library</div>'+
-    '<h1 style="font-size:34px">SETTINGS</h1><div class="rule" style="margin-bottom:12px"></div>'+
-    '<div class="grouphd" style="margin-top:6px">APP THEME</div>'+
+    screenHead("Settings","Appearance, Bible library, and local data")+
+    '<div class="grouphd">APP THEME</div>'+
     '<div class="theme-grid">'+THEMES.map(function(t){ return '<button class="theme-card'+(active===t.id?' on':'')+'" data-themeopt="'+t.id+'">'+
       '<span class="theme-swatch '+t.id+'"></span><span><b>'+t.name+'</b><small>'+t.meta+'</small></span></button>'; }).join('')+'</div>'+
-    '<div class="grouphd" style="margin-top:28px">BIBLE LIBRARY</div>'+
-    '<div class="tier">'+
-      '<div class="tier-top"><div class="tier-label">BEREAN STANDARD BIBLE</div>'+
-        '<div class="tier-badge'+(m?" in":"")+'">'+(m?"INSTALLED":"NOT DOWNLOADED")+'</div></div>'+
-      '<div class="tier-name">Berean Standard Bible (BSB)</div>'+
-      '<div class="tier-note">The public-domain text is bundled with the app. Download it once to import the complete Bible into offline storage.</div>'+
-      '<div class="bar" id="bar-bsb" style="display:none"><i></i></div>'+
-      (m
-        ? '<div class="tier-meta">'+m.verses.toLocaleString()+' VERSE RECORDS · '+m.books+' BOOKS · '+
-          '<span data-drop="bsb" style="cursor:pointer;text-decoration:underline">REMOVE LOCAL COPY</span></div>'
-        : '<button class="tier-btn" data-dl="bsb">DOWNLOAD BSB</button>')+
-    '</div>'+
-    '<div class="grouphd" style="margin-top:30px">YOUR DATA</div>'+
-    '<div class="setrow"><div><div class="lbl">Highlights, Bible notes &amp; bookmarks</div>'+
-      '<div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' bookmarks · '+NOTE_SECTIONS.filter(function(s){ return !!noteValue(s.id).trim(); }).length+' note sections used</div></div>'+
-      '<button class="mini" data-export="1">EXPORT</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Section notes</div>'+
-      '<div class="sub">'+totalSectionNoteChars().toLocaleString()+' characters across sermon, prayer, Bible study, and men’s group notes.</div></div>'+
-      '<button class="mini" data-go="notes">OPEN</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Activity history</div>'+
-      '<div class="sub">'+activity().length+' recent actions saved on this device.</div></div>'+
-      '<button class="mini" data-clearhistory="1">CLEAR</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Reset app data</div>'+
-      '<div class="sub">Removes highlights, Bible notes, section notes, bookmarks, activity, streaks, and the downloaded Bible copy.</div></div>'+
-      '<button class="mini" data-wipe="1" style="color:var(--rust);border-color:rgba(209,169,78,.4)">RESET</button></div>'+
-    '<div class="foot">PUBLIC DOMAIN BIBLE TEXT · READING DATA STAYS LOCAL</div></div>';
+    '<div class="grouphd settings-section-head">BIBLE LIBRARY</div>'+bibleCards+
+    '<div class="settings-legal">ASV and YLT are public domain. The KJV is public domain in the United States; special Crown rights can apply to publication in the United Kingdom.</div>'+
+    '<div class="grouphd settings-section-head">YOUR DATA</div>'+
+    '<div class="setrow"><div><div class="lbl">Highlights &amp; saved Scripture</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' chapter bookmarks · '+vbCount+' verse bookmarks · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Section notes</div><div class="sub">'+totalSectionNoteChars().toLocaleString()+' characters · '+usedSections+' sections used</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, categories, bookmarks, highlights, reading-plan progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Activity history</div><div class="sub">'+activity().length+' recent actions saved on this device.</div></div><button class="mini" data-clearhistory="1">CLEAR</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, bookmarks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
+    '<div class="foot">BIBLE TEXT DOWNLOADS AND YOUR READING DATA STAY ON THIS DEVICE</div></div>';
 }
 
 function doDownload(id){
@@ -1219,9 +1349,9 @@ function doDownload(id){
   .then(function(meta){
     state.meta[id]=meta;
     return loadVersion(id).then(function(){
-      if(!ls("version")||!state.meta[state.version]){ state.version=id; ls("version",id); }
-      logActivity("download","Berean Standard Bible",meta.books+" books");
-      state.tab="bible"; state.bview="read";
+      state.version=id; ls("version",id);
+      logActivity("download",tier.name,meta.books+" books");
+      state.tab="bible"; state.bview="read"; state.sel=null;
       toast(meta.abbr+" ready · "+meta.verses.toLocaleString()+" verse records");
       render();
     });
@@ -1240,6 +1370,7 @@ var TABS=[
   {id:"devotion", label:"DEVOTION"},
   {id:"podcast", label:"PODCAST"},
   {id:"bible", label:"BIBLE"},
+  {id:"notes", label:"NOTES"},
   {id:"history", label:"HISTORY"}
 ];
 
@@ -1339,7 +1470,10 @@ function wire(scr){
     };
   });
   on(scr,"[data-v]",function(b){
-    b.onclick=function(){ openSheet(+b.dataset.v); };
+    b.onclick=function(e){
+      if(e.target.closest("button,a")) return;
+      toggleVerseSelection(+b.dataset.v);
+    };
   });
   on(scr,"[data-font]",function(b){
     b.onclick=function(){
@@ -1388,6 +1522,15 @@ function wire(scr){
   if(notesEditor){
     notesEditor.oninput=function(){ saveNoteValue(state.noteSection, notesEditor.value); };
   }
+  var versionSelect=$("versionSelect");
+  if(versionSelect){
+    versionSelect.onchange=function(){
+      var id=versionSelect.value;
+      if(!state.meta[id]) return;
+      state.version=id; ls("version",id); state.sel=null;
+      loadVersion(id).then(function(){ render(); toast("Now reading "+((state.meta[id]||{}).abbr||id.toUpperCase())); });
+    };
+  }
 
   // History
   on(scr,"[data-history]",function(b){
@@ -1425,6 +1568,42 @@ function wire(scr){
     b.onclick=function(){ state.listTab=b.dataset.list; render(); };
   });
 
+  // Verse selection actions
+  on(scr,"[data-selclear]",function(b){ b.onclick=function(){ state.sel=null; render(); }; });
+  on(scr,"[data-selact]",function(b){
+    b.onclick=function(){
+      if(!state.sel) return;
+      var vs=selectedVerseList(), ref=rangeRef(state.sel.b,state.sel.c,vs), act=b.dataset.selact;
+      if(act==="highlight"){ openSheet(); return; }
+      if(act==="note"){
+        openSheet();
+        setTimeout(function(){ var n=$("sheetNote"); if(n){ n.style.display="block"; n.focus(); } },30);
+        return;
+      }
+      if(act==="copy"){
+        var out=rangeOutput(state.sel.b,state.sel.c,vs);
+        if(navigator.clipboard) navigator.clipboard.writeText(out).then(function(){ logActivity("share",ref,"Copied verse selection"); toast("Copied"); });
+        else toast("Copy isn't available here");
+        return;
+      }
+      if(act==="card"){ openCardForRange(state.sel.b,state.sel.c,vs); return; }
+      if(act==="bookmark"){
+        var r=toggleVerseBookmarks(state.sel.b,state.sel.c,vs);
+        if(r.added) logActivity("bookmark",ref,"Verse bookmark");
+        toast(r.added ? (r.added+" bookmarked") : "Bookmarks removed"); render(); return;
+      }
+      if(act==="category"){ openCategoryPicker(); return; }
+    };
+  });
+
+  // Category page actions
+  on(scr,"[data-catopen]",function(b){ b.onclick=function(){ state.categoryOpen=b.dataset.catopen; state.bview="categories"; render(); }; });
+  on(scr,"[data-catback]",function(b){ b.onclick=function(){ state.categoryOpen=null; render(); }; });
+  on(scr,"[data-catcreate]",function(b){ b.onclick=function(){ var inp=$("categoryLibraryName"); var cat=createCategory(inp?inp.value:""); if(cat){ state.categoryOpen=cat.id; render(); } else toast("Enter a category name"); }; });
+  on(scr,"[data-catrename]",function(b){ b.onclick=function(){ var cat=categoryById(b.dataset.catrename); if(!cat) return; var name=prompt("Rename category",cat.name); if(name){ renameCategory(cat.id,name); render(); } }; });
+  on(scr,"[data-catdelete]",function(b){ b.onclick=function(){ var cat=categoryById(b.dataset.catdelete); if(!cat) return; if(confirm("Delete category ‘"+cat.name+"’? The verses themselves will not be changed.")){ deleteCategory(cat.id); state.categoryOpen=null; render(); } }; });
+  on(scr,"[data-catremove]",function(b){ b.onclick=function(){ var p=b.dataset.catremove.split("|"); removeVerseFromCategory(p[0],p[1]); render(); }; });
+
   // Cards
   on(scr,"[data-ratio]",function(b){
     b.onclick=function(){ state.cardRatio=b.dataset.ratio; render(); };
@@ -1461,14 +1640,18 @@ function wire(scr){
       var id=b.dataset.drop;
       removeTier(id).then(function(){
         delete state.meta[id]; delete state.loaded[id];
-        state.version="bsb"; ls("version","bsb");
+        if(state.version===id){
+          var remaining=installedTiers()[0];
+          state.version=remaining?remaining.id:"bsb";
+          ls("version",state.version);
+        }
         toast("Local Bible copy removed"); render();
       });
     };
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), notes:notesVault(), plandone:planDone(), activity:activity(), theme:state.theme, exported:new Date().toISOString() };
+      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), notes:notesVault(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -1481,7 +1664,7 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("plandone",{}); jset("activity",[]); jset("sectionNotes",{sermon:"",prayer:"",study:"",men:""});
+        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("activity",[]); jset("sectionNotes",{sermon:"",prayer:"",study:"",men:""});
         ls("streak","0"); ls("lastWalk","");
         Promise.all(TIERS.filter(function(t){return t.available;})
           .map(function(t){ return removeTier(t.id); }))
@@ -1595,6 +1778,31 @@ function initSheet(){
     if(navigator.clipboard) navigator.clipboard.writeText(out).then(function(){ toast("Copied"); });
     else toast("Copy isn't available here");
   };
+}
+
+function initCategoryPicker(){
+  var overlay=$("categoryOverlay"), close=$("categoryClose"), list=$("categoryList"), input=$("categoryName"), create=$("categoryCreateApply");
+  if(!overlay||!list||!input||!create) return;
+  if(close) close.onclick=closeCategoryPicker;
+  overlay.onclick=function(e){ if(e.target===overlay) closeCategoryPicker(); };
+  list.onclick=function(e){
+    var b=e.target.closest("[data-categoryapply]");
+    if(!b||!state.sel) return;
+    var added=addSelectionToCategory(b.dataset.categoryapply,state.sel.b,state.sel.c,selectedVerseList());
+    var cat=categoryById(b.dataset.categoryapply);
+    if(added) logActivity("category",rangeRef(state.sel.b,state.sel.c,selectedVerseList()),cat?cat.name:"Category");
+    toast(added ? "Added to "+(cat?cat.name:"category") : "Already in that category");
+    closeCategoryPicker(); render();
+  };
+  create.onclick=function(){
+    if(!state.sel) return;
+    var cat=createCategory(input.value);
+    if(!cat){ toast("Enter a category name"); return; }
+    var added=addSelectionToCategory(cat.id,state.sel.b,state.sel.c,selectedVerseList());
+    if(added) logActivity("category",rangeRef(state.sel.b,state.sel.c,selectedVerseList()),cat.name);
+    toast("Added to "+cat.name); closeCategoryPicker(); render();
+  };
+  input.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); create.click(); } };
 }
 
 /* ---------- temporary install promotion ---------- */
@@ -1737,6 +1945,7 @@ if(settingsBtn) settingsBtn.onclick=function(){ state.tab="settings"; render(); 
 
 applyTheme();
 initSheet();
+initCategoryPicker();
 initInstallPromotion();
 
 refreshMeta()

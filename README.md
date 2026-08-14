@@ -113,3 +113,19 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 - Swapped devotional hero artwork to new Armor of God image paths and overlaid matching Cinzel-styled captions with the related Ephesians 6 references.
 - Made the Reading Plan info card square and added spacing between the Spotify button and the Listen Anywhere box.
 - Added a full Notes section with Sermon Notes, Prayer Requests, Bible Study Notes, and Men’s Group Notes, including a markdown toolbar, preview mode, and export support.
+
+
+## v21 — Bible library, touch selection, categories, modern themes
+- Added downloadable ASV, YLT, and KJV translations alongside the BSB. Each translation is imported into IndexedDB only when the user taps Download, matching the existing BSB offline flow.
+- Added an installed-translation selector in the Bible reader and a multi-translation Bible Library in Settings.
+- Verse selection is now touch-first: tap any number of verses, then highlight, copy, create a verse card, bookmark, add to a named category, or attach a note from a floating action bar.
+- Added named Verse Categories. Categories are reference-based, so a saved category remains useful when switching Bible translations.
+- Verse bookmarks and categories are included in exported app backups.
+- Added Evergreen, Graphite, and Sandstone themes and refreshed the UI with cleaner surfaces, spacing, controls, navigation, and typography while keeping the existing screen layout.
+
+### Bible text sources and rights
+- BSB: bundled public-domain Berean Standard Bible source already used by the app.
+- ASV (1901): public-domain text.
+- YLT: public-domain text by Robert Young.
+- KJV: public domain in the United States. Special Crown rights can apply to printed publication/import in the United Kingdom.
+- ASV/KJV/YLT app data files were normalized from the Scrollmapper Bible Databases plain-text editions into the same tagged verse format used by the BSB importer.

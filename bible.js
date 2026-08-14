@@ -27,9 +27,46 @@ window.TIERS = [
     label: "BIBLE",
     name: "Berean Standard Bible",
     abbr: "BSB",
-    note: "The complete Berean Standard Bible. Download it once, then read all 66 books offline.",
+    note: "Modern public-domain translation. Download once for full offline reading.",
     src: "data/bsb.txt",
     origin: "BereanBible.com",
+    license: "Public Domain",
+    format: "tagged",
+    available: true
+  },
+  {
+    id: "asv",
+    label: "BIBLE",
+    name: "American Standard Version (1901)",
+    abbr: "ASV",
+    note: "Classic formal-equivalence translation first published in 1901.",
+    src: "data/asv.txt",
+    origin: "eBible.org / Scrollmapper",
+    license: "Public Domain",
+    format: "tagged",
+    available: true
+  },
+  {
+    id: "ylt",
+    label: "BIBLE",
+    name: "Young's Literal Translation",
+    abbr: "YLT",
+    note: "Robert Young's highly literal English translation.",
+    src: "data/ylt.txt",
+    origin: "eBible.org / Scrollmapper",
+    license: "Public Domain",
+    format: "tagged",
+    available: true
+  },
+  {
+    id: "kjv",
+    label: "BIBLE",
+    name: "King James Version",
+    abbr: "KJV",
+    note: "The historic King James Version in a 66-book edition.",
+    src: "data/kjv.txt",
+    origin: "eBible.org / Scrollmapper",
+    license: "Public Domain in the United States; special Crown rights may apply in the United Kingdom",
     format: "tagged",
     available: true
   }

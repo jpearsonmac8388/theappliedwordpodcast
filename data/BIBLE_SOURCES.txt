@@ -1,0 +1,21 @@
+The Applied Word Podcast — Bible text sources
+
+BSB — Berean Standard Bible
+Public Domain. Source already bundled with this project from BereanBible.com.
+
+ASV — American Standard Version (1901)
+Public Domain. Normalized for the app from the Scrollmapper Bible Databases plain-text ASV edition, whose underlying ASV text is public domain.
+Reference source: eBible.org identifies the ASV (1901) as Public Domain.
+
+YLT — Young's Literal Translation
+Public Domain. Normalized for the app from the Scrollmapper Bible Databases plain-text YLT edition.
+Reference source: eBible.org identifies Young's Literal Translation as Public Domain.
+
+KJV — King James Version
+Public Domain in the United States. Normalized for the app from the Scrollmapper Bible Databases plain-text KJV edition.
+Reference source: eBible.org identifies the KJV as public domain in the USA and notes special Crown rights concerning publication/import in the United Kingdom.
+
+Each app data file uses one verse per line in the form:
+Book Chapter:Verse<TAB>Verse text
+
+The app imports a translation into IndexedDB only after the user taps its Download button.

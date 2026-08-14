@@ -867,3 +867,150 @@ nav button span{font-size:7.6px}
 .note-mini-card span{display:block;margin-top:7px;font-family:var(--slab);font-size:12px;line-height:1.5;color:var(--bone)}
 body[data-theme="midnight"] .notes-toolbar button, body[data-theme="midnight"] .note-mini-card, body[data-theme="midnight"] .notes-preview, body[data-theme="midnight"] .notes-editor{background:rgba(18,28,42,.46)}
 body[data-theme="slate"] .notes-toolbar button, body[data-theme="slate"] .note-mini-card, body[data-theme="slate"] .notes-preview, body[data-theme="slate"] .notes-editor{background:rgba(34,46,57,.48)}
+
+/* ============================================================
+   v21 MODERN UI — cleaner surfaces, translation library,
+   touch verse selection, verse categories, expanded themes
+   ============================================================ */
+body[data-theme="forest"]{--forge:#0c1915;--ground:#14251f;--raise:#1c332a;--rust:#76a98b;--brass:#b8dfc7;--bone:#eff7f2;--ash:#9bb4aa;--hl-gold:#c9ad63;--hl-rust:#9e6e59;--hl-green:#70a083;--hl-blue:#6e96a4;--hl-violet:#867e9d}
+body[data-theme="graphite"]{--forge:#101316;--ground:#191e23;--raise:#252c33;--rust:#8fa1b2;--brass:#d7e0e8;--bone:#f3f5f7;--ash:#a4adb6;--hl-gold:#c7ab68;--hl-rust:#986f5e;--hl-green:#738d7e;--hl-blue:#718da8;--hl-violet:#837c96}
+body[data-theme="sandstone"]{--forge:#211c17;--ground:#302920;--raise:#41372b;--rust:#b89567;--brass:#e1c79d;--bone:#f6eee1;--ash:#c0ac91;--hl-gold:#d0ad65;--hl-rust:#aa7760;--hl-green:#839274;--hl-blue:#718b9a;--hl-violet:#8b7688}
+.theme-swatch.forest{background:linear-gradient(145deg,#0b1814,#1d392f 58%,#8ac6a0)}
+.theme-swatch.graphite{background:linear-gradient(145deg,#101316,#29313a 58%,#d0d8e0)}
+.theme-swatch.sandstone{background:linear-gradient(145deg,#211b16,#493b2e 58%,#dfbf91)}
+body[data-theme="forest"] #ember{background:radial-gradient(ellipse 70% 100% at 50% 0%,rgba(80,148,111,.16),transparent 72%)}
+body[data-theme="graphite"] #ember{background:radial-gradient(ellipse 70% 100% at 50% 0%,rgba(139,158,178,.11),transparent 72%)}
+body[data-theme="sandstone"] #ember{background:radial-gradient(ellipse 70% 100% at 50% 0%,rgba(199,156,101,.13),transparent 72%)}
+
+/* Modern shared shell */
+body{background:var(--forge);color:var(--bone)}
+.app-header{background:color-mix(in srgb,var(--forge) 88%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid color-mix(in srgb,var(--brass) 14%,transparent)}
+.screen-head{margin-bottom:17px}
+.screen-title{letter-spacing:-.035em}
+.screen-subtitle{opacity:.86}
+.feature-card,.content-card,.reader-shell,.podcast-showcase,.helper-card,.modern-walk,.tier,.library-card,.notes-shell{
+  background:linear-gradient(155deg,color-mix(in srgb,var(--raise) 86%,transparent),color-mix(in srgb,var(--ground) 93%,transparent));
+  border:1px solid color-mix(in srgb,var(--brass) 12%,transparent);
+  border-radius:16px;
+  box-shadow:0 12px 34px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.025);
+}
+.cta,.tier-btn{border-radius:12px;letter-spacing:.08em;box-shadow:none}
+.cta{background:linear-gradient(180deg,var(--brass),color-mix(in srgb,var(--brass) 72%,var(--rust)));color:var(--forge)}
+.cta.ghost,.tier-btn.ghost{background:transparent;color:var(--brass);border:1px solid color-mix(in srgb,var(--brass) 25%,transparent)}
+.tabsel{background:color-mix(in srgb,var(--ground) 78%,transparent);border:1px solid color-mix(in srgb,var(--brass) 9%,transparent);border-radius:13px;padding:4px;gap:4px}
+.tabsel button{border-radius:10px;border:0}
+.tabsel button.on{background:color-mix(in srgb,var(--raise) 95%,transparent);box-shadow:0 4px 12px rgba(0,0,0,.12);color:var(--brass)}
+.reader-search-btn,.readbar,.reader-tools button,.quick-card,.timeline-row,.saved-row,.search-result{border-color:color-mix(in srgb,var(--brass) 11%,transparent)}
+.reader-shell{overflow:visible}
+.v{position:relative;transition:background .14s ease,transform .14s ease,border-color .14s ease;border:1px solid transparent}
+.v:active{transform:scale(.995)}
+.v.sel{background:color-mix(in srgb,var(--brass) 10%,transparent);border-color:color-mix(in srgb,var(--brass) 22%,transparent);box-shadow:inset 3px 0 0 var(--brass)}
+.v .marks{color:var(--brass)}
+
+/* Translation selection */
+.translation-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin:0 0 11px;padding:9px 10px;border-radius:13px;background:color-mix(in srgb,var(--ground) 74%,transparent);border:1px solid color-mix(in srgb,var(--brass) 10%,transparent)}
+.translation-row label{font-family:var(--util);font-size:7.5px;font-weight:700;letter-spacing:.12em;color:var(--ash)}
+.translation-row select{min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--bone);font-family:var(--slab);font-size:12px;font-weight:700}
+.translation-row select option{background:var(--ground);color:var(--bone)}
+.translation-row button{border:0;background:transparent;color:var(--brass);font-family:var(--util);font-size:7.5px;font-weight:700;letter-spacing:.08em;padding:7px 2px}
+.modern-tools{grid-template-columns:1.1fr 1.35fr 48px 48px 44px}
+.modern-tools button{font-size:8px;letter-spacing:.04em}
+
+/* Downloadable Bible library */
+.bible-library-page .library-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.library-card{padding:15px;display:grid;grid-template-columns:54px 1fr;gap:12px;align-items:start}
+.library-abbr{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--brass) 12%,transparent);border:1px solid color-mix(in srgb,var(--brass) 20%,transparent);font-family:'Cinzel',var(--slab);font-size:15px;font-weight:800;color:var(--brass)}
+.library-card h3{font-family:var(--slab);font-size:15px;line-height:1.2;color:var(--bone)}
+.library-card p{margin-top:6px;font-size:12px;line-height:1.45;color:var(--ash)}
+.library-card small{display:block;margin-top:7px;font-family:var(--util);font-size:7px;line-height:1.4;letter-spacing:.07em;color:var(--brass)}
+.library-card .bar,.library-card .cta{grid-column:1/-1}
+.library-card .cta{margin-top:1px}
+
+/* Translation cards in Settings */
+.settings-section-head{margin-top:28px!important}
+.modern-tier{margin-top:10px;padding:14px}
+.modern-tier .tier-license{margin-top:8px;font-family:var(--util);font-size:7px;line-height:1.45;letter-spacing:.06em;color:var(--ash)}
+.tier-actions{display:flex;gap:8px;margin-top:13px}
+.tier-btn.compact{flex:1;margin-top:0;padding:10px 9px}
+.settings-legal{margin-top:12px;padding:10px 11px;border-left:2px solid var(--brass);font-size:10.5px;line-height:1.5;color:var(--ash);background:color-mix(in srgb,var(--ground) 55%,transparent)}
+.mini.danger{color:#d89082!important;border-color:rgba(216,144,130,.3)!important}
+
+/* Verse tags */
+.verse-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.verse-tag{display:inline-flex;align-items:center;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 6px;border-radius:999px;background:color-mix(in srgb,var(--brass) 11%,transparent);border:1px solid color-mix(in srgb,var(--brass) 14%,transparent);font-family:var(--util);font-size:6.8px;letter-spacing:.04em;color:var(--brass)}
+.verse-tag.bookmark{min-width:22px;justify-content:center}
+
+/* Floating touch selection toolbar */
+.verse-selection-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(70px + env(safe-area-inset-bottom));z-index:44;width:min(460px,calc(100vw - 18px));padding:9px;border-radius:17px;background:color-mix(in srgb,var(--ground) 96%,transparent);border:1px solid color-mix(in srgb,var(--brass) 21%,transparent);box-shadow:0 16px 40px rgba(0,0,0,.42);backdrop-filter:blur(18px)}
+.selection-summary{display:grid;grid-template-columns:auto 1fr 28px;gap:8px;align-items:center;padding:1px 2px 8px}
+.selection-summary b{font-family:var(--util);font-size:8px;letter-spacing:.09em;color:var(--brass)}
+.selection-summary span{font-family:var(--slab);font-size:10px;color:var(--ash);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selection-summary button{width:28px;height:28px;border-radius:50%;border:0;background:color-mix(in srgb,var(--raise) 85%,transparent);color:var(--ash);font-size:17px}
+.selection-actions{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+.selection-actions::-webkit-scrollbar{display:none}
+.selection-actions button{flex:0 0 69px;min-height:49px;border-radius:11px;border:1px solid color-mix(in srgb,var(--brass) 10%,transparent);background:color-mix(in srgb,var(--raise) 78%,transparent);color:var(--bone);font-family:var(--util);font-size:6.4px;font-weight:700;letter-spacing:.035em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.selection-actions button span{font-size:15px;color:var(--brass)}
+.bible-page.has-selection{padding-bottom:145px}
+
+/* Category picker modal */
+.category-overlay{position:fixed;inset:0;z-index:105;display:flex;align-items:flex-end;justify-content:center;padding:16px 10px calc(16px + env(safe-area-inset-bottom));background:rgba(5,7,9,.72);backdrop-filter:blur(9px)}
+.category-overlay[hidden]{display:none!important}
+.category-panel{width:min(460px,100%);max-height:78dvh;overflow:auto;border-radius:20px;padding:15px;background:linear-gradient(180deg,var(--raise),var(--ground));border:1px solid color-mix(in srgb,var(--brass) 20%,transparent);box-shadow:0 22px 60px rgba(0,0,0,.5)}
+.category-panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.category-panel h2{font-family:var(--slab);font-size:20px;color:var(--bone);margin-top:3px}
+.category-pick-list{display:grid;gap:7px;margin-top:13px}
+.category-pick{display:flex;justify-content:space-between;gap:12px;align-items:center;text-align:left;padding:12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--brass) 11%,transparent);background:color-mix(in srgb,var(--forge) 25%,transparent);color:var(--bone)}
+.category-pick b{font-family:var(--slab);font-size:13px}
+.category-pick span{font-family:var(--util);font-size:7px;color:var(--ash)}
+.category-empty{padding:17px;text-align:center;color:var(--ash);font-size:12px}
+.category-new-row{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:12px}
+.category-new-row input{min-width:0;padding:12px;border-radius:11px;border:1px solid color-mix(in srgb,var(--brass) 16%,transparent);background:color-mix(in srgb,var(--forge) 35%,transparent);color:var(--bone);font-family:var(--slab);font-size:13px}
+.category-new-row button{padding:10px 11px;border-radius:11px;border:0;background:var(--brass);color:var(--forge);font-family:var(--util);font-size:7px;font-weight:700;letter-spacing:.05em}
+
+/* Category library page */
+.category-create{margin-top:0}
+.category-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}
+.category-card{min-height:112px;text-align:left;padding:13px;border-radius:15px;border:1px solid color-mix(in srgb,var(--brass) 12%,transparent);background:linear-gradient(150deg,color-mix(in srgb,var(--raise) 87%,transparent),color-mix(in srgb,var(--ground) 96%,transparent));color:var(--bone)}
+.category-icon{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--brass) 11%,transparent);color:var(--brass);font-size:18px}
+.category-card b{display:block;margin-top:13px;font-family:var(--slab);font-size:13px;line-height:1.2}
+.category-card small{display:block;margin-top:5px;font-family:var(--util);font-size:7px;letter-spacing:.06em;color:var(--ash)}
+.category-toolbar{display:flex;gap:7px;margin-top:-5px;margin-bottom:12px}
+.category-verses{display:grid;gap:7px}
+.category-verse-row{display:grid;grid-template-columns:1fr 38px;gap:5px;align-items:stretch}
+.category-verse-row>button:first-child{text-align:left;padding:12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--brass) 10%,transparent);background:color-mix(in srgb,var(--raise) 58%,transparent);color:var(--bone)}
+.category-verse-row b{display:block;color:var(--brass);font-family:var(--util);font-size:8px;letter-spacing:.06em}
+.category-verse-row span{display:block;margin-top:6px;font-family:var(--scrip);font-size:12px;line-height:1.45;color:var(--bone)}
+.category-remove{border-radius:12px;border:1px solid rgba(216,144,130,.16);background:rgba(133,57,48,.1);color:#d89082;font-size:18px}
+
+/* Modern bottom navigation */
+nav{background:color-mix(in srgb,var(--ground) 96%,transparent);backdrop-filter:blur(18px);border-top:1px solid color-mix(in srgb,var(--brass) 10%,transparent);box-shadow:0 -8px 30px rgba(0,0,0,.16)}
+nav button{min-width:0;color:var(--ash)}
+nav button::after{display:none}
+nav button.on{color:var(--brass)}
+nav button.on i{background:color-mix(in srgb,var(--brass) 12%,transparent);border-radius:9px}
+nav button i{width:29px;height:27px;transition:background .15s ease}
+nav button span{font-size:6.9px;letter-spacing:.02em}
+
+@media (max-width:390px){
+  .modern-tools{grid-template-columns:1fr 1.2fr 43px 43px 39px}
+  .modern-tools button{font-size:7px;padding-left:3px;padding-right:3px}
+  .translation-row{grid-template-columns:1fr auto}.translation-row label{display:none}
+  .category-grid{grid-template-columns:1fr 1fr}
+  .selection-actions button{flex-basis:66px}
+  nav button span{font-size:6.3px}
+}
+
+/* v21 variable-driven surface cleanup */
+.theme-card,.quick-card,.reader-search-btn,.readbar button,.reader-tools button,.timeline-row,.saved-row,.search-result,.setrow,.stream{
+  background:color-mix(in srgb,var(--raise) 72%,var(--ground));
+  color:var(--bone);
+}
+.theme-card{border-color:color-mix(in srgb,var(--brass) 12%,transparent)}
+.quick-card{border-color:color-mix(in srgb,var(--brass) 11%,transparent)}
+.reader-body{background:color-mix(in srgb,var(--forge) 28%,transparent)}
+.timeline-icon{background:color-mix(in srgb,var(--raise) 86%,transparent)}
+.history-stats div{background:color-mix(in srgb,var(--raise) 72%,var(--ground));border-color:color-mix(in srgb,var(--brass) 9%,transparent)}
+.notes-toolbar button,.note-mini-card,.notes-preview,.notes-editor{background:color-mix(in srgb,var(--forge) 28%,transparent)}
+.category-create-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:2px}
+.category-create-row input{min-width:0;padding:12px 13px;border-radius:12px;border:1px solid color-mix(in srgb,var(--brass) 14%,transparent);background:color-mix(in srgb,var(--raise) 64%,var(--ground));color:var(--bone);font-family:var(--slab);font-size:13px}
+.category-create-row button{padding:10px 14px;border:0;border-radius:12px;background:var(--brass);color:var(--forge);font-family:var(--util);font-size:8px;font-weight:700;letter-spacing:.06em}
