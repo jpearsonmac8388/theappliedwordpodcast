@@ -161,7 +161,9 @@ var state = {
   cardRatio: "9:16", cardVerse: null,
   // notes
   noteSection: ls("noteSection") || "sermon",
+  noteId: null,
   notePreview: false,
+  returnTab: "devotion",
   categoryOpen: null
 };
 
@@ -188,76 +190,119 @@ function toggleBookmark(b,c){
   list.unshift({b:b,c:c,at:Date.now()}); jset("bookmarks",list); return true;
 }
 
-/* ---------- section notes ---------- */
+/* ---------- notes library ---------- */
 var NOTE_SECTIONS=[
-  {id:"sermon", label:"SERMON NOTES", hint:"Capture key points, verses, and takeaways from a sermon."},
-  {id:"prayer", label:"PRAYER REQUESTS", hint:"Keep prayer needs, answers, and people you are interceding for."},
-  {id:"study", label:"BIBLE STUDY NOTES", hint:"Record observations, cross references, and study thoughts."},
-  {id:"men", label:"MEN’S GROUP NOTES", hint:"Track discussion points, accountability, and next steps."}
+  {id:"sermon", label:"SERMON NOTES", short:"SERMON", hint:"Capture key points, verses, and takeaways from a sermon.", kind:"document"},
+  {id:"prayer", label:"PRAYER REQUESTS", short:"PRAYER", hint:"Keep prayer needs and answers in a simple running list.", kind:"prayer"},
+  {id:"study", label:"BIBLE STUDY NOTES", short:"STUDY", hint:"Record observations, cross references, and study thoughts.", kind:"document"},
+  {id:"men", label:"MEN’S GROUP NOTES", short:"MEN’S GROUP", hint:"Track discussion points, accountability, and next steps.", kind:"document"}
 ];
-function notesVault(){
-  var base={sermon:"",prayer:"",study:"",men:""};
-  var saved=jget("sectionNotes",{});
-  Object.keys(base).forEach(function(k){ if(typeof saved[k]!=="string") saved[k]=base[k]; });
-  return saved;
+function noteSectionById(id){ return NOTE_SECTIONS.find(function(s){return s.id===id;}) || NOTE_SECTIONS[0]; }
+function makeId(prefix){ return prefix+"-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
+function normalizeNoteLibrary(lib){
+  lib=lib&&typeof lib==="object"?lib:{};
+  if(!lib.docs) lib.docs={};
+  ["sermon","study","men"].forEach(function(k){ if(!Array.isArray(lib.docs[k])) lib.docs[k]=[]; });
+  if(!Array.isArray(lib.prayers)) lib.prayers=[];
+  return lib;
 }
-function noteValue(id){ return notesVault()[id] || ""; }
-function saveNoteValue(id, val){
-  var all=notesVault();
-  all[id]=String(val||"");
-  jset("sectionNotes",all);
+function noteLibrary(){
+  var lib=jget("noteLibrary",null);
+  if(lib) return normalizeNoteLibrary(lib);
+  lib=normalizeNoteLibrary({});
+  var legacy=jget("sectionNotes",{}), now=Date.now();
+  ["sermon","study","men"].forEach(function(k){
+    var body=typeof legacy[k]==="string"?legacy[k].trim():"";
+    if(body) lib.docs[k].push({id:makeId("note"),title:"Imported note",body:body,created:now,updated:now});
+  });
+  var prayer=typeof legacy.prayer==="string"?legacy.prayer.trim():"";
+  if(prayer) lib.prayers.push({id:makeId("prayer"),text:prayer,answered:false,created:now,updated:now});
+  jset("noteLibrary",lib);
+  return lib;
 }
-function totalSectionNoteChars(){
-  var all=notesVault(), n=0;
-  Object.keys(all).forEach(function(k){ n += (all[k]||"").trim().length; });
-  return n;
+function saveNoteLibrary(lib){ jset("noteLibrary",normalizeNoteLibrary(lib)); }
+function docsFor(section){ var lib=noteLibrary(); return (lib.docs[section]||[]).slice().sort(function(a,b){return (b.updated||0)-(a.updated||0);}); }
+function findDoc(section,id){ return docsFor(section).find(function(n){return n.id===id;}) || null; }
+function createDoc(section){
+  var lib=noteLibrary(), now=Date.now(), doc={id:makeId("note"),title:"",body:"",created:now,updated:now};
+  lib.docs[section].unshift(doc); saveNoteLibrary(lib); return doc;
 }
+function saveDoc(section,id,title,body){
+  var lib=noteLibrary(), list=lib.docs[section]||[], doc=list.find(function(n){return n.id===id;});
+  if(!doc) return null;
+  doc.title=String(title||"").trim(); doc.body=String(body||""); doc.updated=Date.now();
+  saveNoteLibrary(lib); return doc;
+}
+function deleteDoc(section,id){
+  var lib=noteLibrary(); lib.docs[section]=(lib.docs[section]||[]).filter(function(n){return n.id!==id;}); saveNoteLibrary(lib);
+}
+function prayerRequests(){ return noteLibrary().prayers.slice().sort(function(a,b){return (b.created||0)-(a.created||0);}); }
+function createPrayer(){
+  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:"",answered:false,created:now,updated:now};
+  lib.prayers.unshift(item); saveNoteLibrary(lib); return item;
+}
+function savePrayer(id,textVal){
+  var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(!item) return;
+  item.text=String(textVal||""); item.updated=Date.now(); saveNoteLibrary(lib);
+}
+function togglePrayer(id){
+  var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(!item) return;
+  item.answered=!item.answered; item.updated=Date.now(); saveNoteLibrary(lib);
+}
+function deletePrayer(id){ var lib=noteLibrary(); lib.prayers=lib.prayers.filter(function(x){return x.id!==id;}); saveNoteLibrary(lib); }
+function noteStats(){
+  var lib=noteLibrary(), docs=0, chars=0;
+  ["sermon","study","men"].forEach(function(k){ docs+=(lib.docs[k]||[]).length; (lib.docs[k]||[]).forEach(function(n){chars+=(n.title||"").length+(n.body||"").length;}); });
+  lib.prayers.forEach(function(r){chars+=(r.text||"").length;});
+  return {docs:docs,prayers:lib.prayers.length,chars:chars};
+}
+function notePreviewText(body){ return snip(String(body||"").replace(/[#*_>`\[\]-]/g," ").replace(/\s+/g," ").trim(),150); }
 function renderMarkdown(src){
-  var text=esc(String(src||"").replace(/\r/g,""));
-  if(!text.trim()) return '<p class="md-empty">Nothing here yet. Start writing in the editor.</p>';
-  text=text.replace(/^### (.*)$/gm,'<h3>$1</h3>')
-           .replace(/^## (.*)$/gm,'<h2>$1</h2>')
-           .replace(/^# (.*)$/gm,'<h1>$1</h1>')
-           .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-           .replace(/\*(.+?)\*/g,'<em>$1</em>')
-           .replace(/`([^`]+)`/g,'<code>$1</code>');
-  var lines=text.split('\n');
-  var out=[], inUl=false, inOl=false;
-  function closeLists(){ if(inUl){ out.push('</ul>'); inUl=false; } if(inOl){ out.push('</ol>'); inOl=false; } }
+  var md=esc(String(src||"").replace(/\r/g,""));
+  if(!md.trim()) return '<p class="md-empty">Nothing here yet. Start writing in the editor.</p>';
+  md=md.replace(/^### (.*)$/gm,'<h3>$1</h3>')
+       .replace(/^## (.*)$/gm,'<h2>$1</h2>')
+       .replace(/^# (.*)$/gm,'<h1>$1</h1>')
+       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+       .replace(/\*(.+?)\*/g,'<em>$1</em>')
+       .replace(/`([^`]+)`/g,'<code>$1</code>');
+  var lines=md.split('\n'), out=[], inUl=false, inOl=false;
+  function closeLists(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}}
   lines.forEach(function(line){
-    if(/^\s*$/.test(line)){ closeLists(); return; }
+    if(/^\s*$/.test(line)){closeLists();return;}
     var m;
-    if((m=line.match(/^\- \[ \] (.*)$/))){ if(inOl){ out.push('</ol>'); inOl=false; } if(!inUl){ out.push('<ul class="md-check">'); inUl=true; } out.push('<li><span class="box"></span><span>'+m[1]+'</span></li>'); return; }
-    if((m=line.match(/^\- \[x\] (.*)$/i))){ if(inOl){ out.push('</ol>'); inOl=false; } if(!inUl){ out.push('<ul class="md-check">'); inUl=true; } out.push('<li><span class="box checked">✓</span><span>'+m[1]+'</span></li>'); return; }
-    if((m=line.match(/^\- (.*)$/))){ if(inOl){ out.push('</ol>'); inOl=false; } if(!inUl){ out.push('<ul>'); inUl=true; } out.push('<li>'+m[1]+'</li>'); return; }
-    if((m=line.match(/^\d+\. (.*)$/))){ if(inUl){ out.push('</ul>'); inUl=false; } if(!inOl){ out.push('<ol>'); inOl=true; } out.push('<li>'+m[1]+'</li>'); return; }
+    if((m=line.match(/^\- \[ \] (.*)$/))){if(inOl){out.push('</ol>');inOl=false;}if(!inUl){out.push('<ul class="md-check">');inUl=true;}out.push('<li><span class="box"></span><span>'+m[1]+'</span></li>');return;}
+    if((m=line.match(/^\- \[x\] (.*)$/i))){if(inOl){out.push('</ol>');inOl=false;}if(!inUl){out.push('<ul class="md-check">');inUl=true;}out.push('<li><span class="box checked">✓</span><span>'+m[1]+'</span></li>');return;}
+    if((m=line.match(/^\- (.*)$/))){if(inOl){out.push('</ol>');inOl=false;}if(!inUl){out.push('<ul>');inUl=true;}out.push('<li>'+m[1]+'</li>');return;}
+    if((m=line.match(/^\d+\. (.*)$/))){if(inUl){out.push('</ul>');inUl=false;}if(!inOl){out.push('<ol>');inOl=true;}out.push('<li>'+m[1]+'</li>');return;}
     closeLists();
-    if((m=line.match(/^&gt;\s?(.*)$/))){ out.push('<blockquote>'+m[1]+'</blockquote>'); return; }
+    if((m=line.match(/^&gt;\s?(.*)$/))){out.push('<blockquote>'+m[1]+'</blockquote>');return;}
     out.push('<p>'+line+'</p>');
   });
-  closeLists();
-  return out.join('');
+  closeLists(); return out.join('');
 }
-function noteButtonLabel(){ return state.notePreview ? 'EDIT' : 'PREVIEW'; }
+function noteButtonLabel(){ return state.notePreview ? "EDIT" : "PREVIEW"; }
+function saveOpenNote(){
+  if(!state.noteId || state.noteSection==="prayer") return;
+  var current=findDoc(state.noteSection,state.noteId); if(!current) return;
+  var title=$("noteTitle"), body=$("notesEditor");
+  saveDoc(state.noteSection,state.noteId,title?title.value:current.title,body?body.value:current.body);
+}
 function applyMarkdownAction(action){
-  var ta=$("notesEditor");
-  if(!ta) return;
-  var start=ta.selectionStart||0, end=ta.selectionEnd||0, val=ta.value||"", sel=val.slice(start,end), rep="";
+  var ta=$("notesEditor"); if(!ta) return;
+  var start=ta.selectionStart||0,end=ta.selectionEnd||0,val=ta.value||"",sel=val.slice(start,end),rep="";
   switch(action){
-    case 'bold': rep='**'+(sel||'bold text')+'**'; break;
-    case 'italic': rep='*'+(sel||'italic text')+'*'; break;
-    case 'h2': rep='## '+(sel||'Section title'); break;
-    case 'bullet': rep='- '+(sel||'List item'); break;
-    case 'check': rep='- [ ] '+(sel||'Checklist item'); break;
-    case 'quote': rep='> '+(sel||'Quoted note'); break;
-    case 'verse': rep='**Scripture:** '+(sel||'Book 1:1'); break;
-    default: return;
+    case "bold":rep="**"+(sel||"bold text")+"**";break;
+    case "italic":rep="*"+(sel||"italic text")+"*";break;
+    case "h2":rep="## "+(sel||"Section title");break;
+    case "bullet":rep="- "+(sel||"List item");break;
+    case "check":rep="- [ ] "+(sel||"Checklist item");break;
+    case "quote":rep="> "+(sel||"Quoted note");break;
+    case "verse":rep="**Scripture:** "+(sel||"Book 1:1");break;
+    default:return;
   }
-  ta.setRangeText(rep,start,end,'end');
-  ta.focus();
-  saveNoteValue(state.noteSection, ta.value);
+  ta.setRangeText(rep,start,end,"end"); saveOpenNote(); ta.focus();
 }
-
 
 /* ---------- verse bookmarks + categories ---------- */
 function verseBookmarks(){ return jget("verseBookmarks",[]); }
@@ -1044,38 +1089,67 @@ function listView(){
       '<button class="'+(t==="bookmarks"?"on":"")+'" data-list="bookmarks">BOOKMARKS</button>'+
     '</div><div style="margin-top:10px">'+rows+'</div></div>';
 }
+function notesTabsHTML(){
+  return '<div class="tabsel notes-tabs">'+NOTE_SECTIONS.map(function(s){
+    return '<button class="'+(s.id===state.noteSection?'on':'')+'" data-notesection="'+s.id+'">'+s.short+'</button>';
+  }).join('')+'</div>';
+}
+function noteListView(sec){
+  var docs=docsFor(sec.id);
+  var rows=docs.length?docs.map(function(n){
+    var title=(n.title||'').trim()||'Untitled note';
+    var preview=notePreviewText(n.body)||'No note text yet.';
+    var d=new Date(n.updated||n.created||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<button class="note-list-card" data-noteopen="'+n.id+'">'+
+      '<span class="note-list-top"><b>'+esc(title)+'</b><small>'+esc(d)+'</small></span>'+
+      '<span class="note-list-preview">'+esc(preview)+'</span>'+
+      '<span class="note-list-meta">'+(n.body||'').length.toLocaleString()+' CHARACTERS</span></button>';
+  }).join(''):emptyBox('NO NOTES YET','Create a note and it will appear here with its title and a preview.');
+  return '<div class="pad notes-page">'+screenHead('Notes','Saved, titled notes with Markdown support')+
+    notesTabsHTML()+
+    '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>'+sec.hint+'</p></div><button class="primary-mini" data-notenew="'+sec.id+'">+ NEW NOTE</button></div>'+
+    '<div class="note-list">'+rows+'</div>'+
+    '<div class="foot">NOTES SAVE LOCALLY AND ARE INCLUDED IN APP BACKUPS</div></div>';
+}
+function noteEditorView(sec,doc){
+  if(!doc){state.noteId=null;return noteListView(sec);}
+  var updated=new Date(doc.updated||doc.created||Date.now()).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  return '<div class="pad notes-page note-editor-page">'+
+    '<div class="nested-topbar"><button class="backlink compact-back" data-noteback="1">‹ NOTES</button><span>LAST SAVED '+esc(updated.toUpperCase())+'</span></div>'+
+    '<input id="noteTitle" class="note-title-input" type="text" placeholder="Note title" value="'+esc(doc.title||'')+'" autocomplete="off">'+
+    '<div class="notes-toolbar compact-toolbar" role="toolbar" aria-label="Markdown formatting">'+
+      '<button type="button" data-md="bold" aria-label="Bold" title="Bold"><b>B</b></button>'+
+      '<button type="button" data-md="italic" aria-label="Italic" title="Italic"><i>I</i></button>'+
+      '<button type="button" data-md="h2" aria-label="Heading" title="Heading">H</button>'+
+      '<button type="button" data-md="bullet" aria-label="Bullet list" title="Bullet list">•</button>'+
+      '<button type="button" data-md="check" aria-label="Checklist" title="Checklist">☑</button>'+
+      '<button type="button" data-md="quote" aria-label="Quote" title="Quote">❝</button>'+
+      '<button type="button" data-md="verse" aria-label="Scripture reference" title="Scripture">§</button>'+
+    '</div>'+
+    (state.notePreview?'<div class="notes-preview markdown-body">'+renderMarkdown(doc.body||'')+'</div>':'<textarea id="notesEditor" class="notes-editor" placeholder="Write your note in Markdown…">'+esc(doc.body||'')+'</textarea>')+
+    '<div class="note-editor-actions"><button class="secondary-btn" data-notepreview="1">'+noteButtonLabel()+'</button><button class="secondary-btn danger" data-notedelete="'+doc.id+'">DELETE</button><button class="primary-btn" data-notesave="1">SAVE NOTE</button></div>'+
+    '<div class="notes-meta">MARKDOWN SUPPORTED · AUTOSAVED ON THIS DEVICE</div></div>';
+}
+function prayerNotesView(sec){
+  var prayers=prayerRequests();
+  var rows=prayers.length?prayers.map(function(r){
+    var d=new Date(r.updated||r.created||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<div class="prayer-card'+(r.answered?' answered':'')+'">'+
+      '<div class="prayer-card-head"><span>'+esc(d)+'</span><div><button class="icon-text-btn" data-prayertoggle="'+r.id+'">'+(r.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button><button class="icon-only-btn danger" data-prayerdelete="'+r.id+'" aria-label="Delete prayer request">×</button></div></div>'+
+      '<textarea class="prayer-text" data-prayertext="'+r.id+'" placeholder="Prayer request…">'+esc(r.text||'')+'</textarea>'+
+      (r.answered?'<div class="prayer-status">✓ ANSWERED</div>':'')+'</div>';
+  }).join(''):emptyBox('NO PRAYER REQUESTS YET','Add a request below. Each request can be as long as you need.');
+  return '<div class="pad notes-page prayer-page">'+screenHead('Notes','Prayer requests in a simple running list')+
+    notesTabsHTML()+
+    '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>'+sec.hint+'</p></div><button class="primary-mini" data-prayernew="1">+ ADD REQUEST</button></div>'+
+    '<div class="prayer-list">'+rows+'</div>'+
+    '<div class="foot">NO CHARACTER LIMIT · SAVED LOCALLY · INCLUDED IN BACKUPS</div></div>';
+}
 function notesView(){
-  var sec=NOTE_SECTIONS.filter(function(x){ return x.id===state.noteSection; })[0] || NOTE_SECTIONS[0];
-  var val=noteValue(sec.id);
-  return '<div class="pad notes-page">'+
-    screenHead("Notes","Markdown note sections saved on this device")+
-    '<div class="tabsel notes-tabs">'+NOTE_SECTIONS.map(function(s){ return '<button class="'+(s.id===sec.id?'on':'')+'" data-notesection="'+s.id+'">'+s.label.replace(' NOTES','')+'</button>'; }).join('')+'</div>'+
-    '<div class="content-card notes-shell">'+
-      '<div class="content-kicker">'+sec.label+'</div>'+
-      '<p class="muted notes-hint">'+sec.hint+'</p>'+
-      '<div class="notes-toolbar">'+
-        '<button type="button" data-md="bold"><b>B</b></button>'+
-        '<button type="button" data-md="italic"><i>I</i></button>'+
-        '<button type="button" data-md="h2">H2</button>'+
-        '<button type="button" data-md="bullet">• LIST</button>'+
-        '<button type="button" data-md="check">☑ CHECK</button>'+
-        '<button type="button" data-md="quote">❝ QUOTE</button>'+
-        '<button type="button" data-md="verse">VERSE</button>'+
-      '</div>'+
-      '<div class="notes-actions">'+
-        '<button class="mini" data-notepreview="1">'+noteButtonLabel()+'</button>'+
-        '<button class="mini" data-notecopy="1">COPY MD</button>'+
-      '</div>'+
-      (state.notePreview
-        ? '<div class="notes-preview markdown-body">'+renderMarkdown(val)+'</div>'
-        : '<textarea id="notesEditor" class="notes-editor" placeholder="Write in markdown…">'+esc(val)+'</textarea>')+
-      '<div class="notes-meta">MARKDOWN SUPPORTED · INCLUDED IN APP EXPORTS</div>'+
-    '</div>'+
-    '<div class="content-card helper-card notes-overview">'+
-      '<div class="content-kicker">SECTION OVERVIEW</div>'+
-      '<div class="notes-overview-grid">'+NOTE_SECTIONS.map(function(s){ var txt=noteValue(s.id); return '<button class="note-mini-card" data-notesection="'+s.id+'"><b>'+s.label+'</b><span>'+esc(snip(txt||'Start writing in this section.',70))+'</span></button>'; }).join('')+'</div>'+
-    '</div>'+
-    '<div class="foot">SERMON · PRAYER · STUDY · MEN’S GROUP</div></div>';
+  var sec=noteSectionById(state.noteSection);
+  if(sec.kind==='prayer') return prayerNotesView(sec);
+  if(state.noteId) return noteEditorView(sec,findDoc(sec.id,state.noteId));
+  return noteListView(sec);
 }
 
 function emptyBox(h,p){
@@ -1290,6 +1364,7 @@ function openCardForRange(b,c,vs){
   var ref=rangeRef(b,c,vs);
   state.cardVerse={ ref:ref, text:text, abbr:(state.meta[state.version]||{}).abbr||"BSB", verses:vs.slice() };
   logActivity("card",ref,"Verse card");
+  state.returnTab=state.tab;
   state.tab="card"; render();
 }
 function openCardFor(b,c,v){ openCardForRange(b,c,[v]); }
@@ -1299,7 +1374,7 @@ function openCardFor(b,c,v){ openCardForRange(b,c,[v]); }
    ============================================================ */
 function settingsView(){
   var active=getTheme().id;
-  var usedSections=NOTE_SECTIONS.filter(function(s){ return !!noteValue(s.id).trim(); }).length;
+  var nstats=noteStats();
   var catCount=categories().length;
   var vbCount=verseBookmarks().length;
   var bibleCards=TIERS.filter(function(t){return t.available;}).map(function(t){
@@ -1317,7 +1392,7 @@ function settingsView(){
   }).join('');
 
   return '<div class="pad settings-page">'+
-    '<button class="backlink" data-go="'+(anyInstalled()?'bible':'devotion')+'">&#8249; BACK</button>'+
+    '<button class="backlink" data-appback="1">&#8249; BACK</button>'+
     screenHead("Settings","Appearance, Bible library, and local data")+
     '<div class="grouphd">APP THEME</div>'+
     '<div class="theme-grid">'+THEMES.map(function(t){ return '<button class="theme-card'+(active===t.id?' on':'')+'" data-themeopt="'+t.id+'">'+
@@ -1326,7 +1401,7 @@ function settingsView(){
     '<div class="settings-legal">ASV and YLT are public domain. The KJV is public domain in the United States; special Crown rights can apply to publication in the United Kingdom.</div>'+
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
     '<div class="setrow"><div><div class="lbl">Highlights &amp; saved Scripture</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' chapter bookmarks · '+vbCount+' verse bookmarks · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Section notes</div><div class="sub">'+totalSectionNoteChars().toLocaleString()+' characters · '+usedSections+' sections used</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Notes library</div><div class="sub">'+nstats.docs+' saved notes · '+nstats.prayers+' prayer requests · '+nstats.chars.toLocaleString()+' characters</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, categories, bookmarks, highlights, reading-plan progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
     '<div class="setrow"><div><div class="lbl">Activity history</div><div class="sub">'+activity().length+' recent actions saved on this device.</div></div><button class="mini" data-clearhistory="1">CLEAR</button></div>'+
     '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, bookmarks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
@@ -1374,6 +1449,22 @@ var TABS=[
   {id:"history", label:"HISTORY"}
 ];
 
+function backAvailable(){
+  if(state.tab==="settings" || state.tab==="card") return true;
+  if(state.tab==="devotion" && state.devMode==="plan") return true;
+  if(state.tab==="bible" && (state.bview!=="read" || state.categoryOpen)) return true;
+  if(state.tab==="notes" && state.noteId) return true;
+  return false;
+}
+function appBack(){
+  if(state.tab==="notes" && state.noteId){ saveOpenNote(); state.noteId=null; state.notePreview=false; render(); return; }
+  if(state.tab==="bible" && state.categoryOpen){ state.categoryOpen=null; state.bview="categories"; render(); return; }
+  if(state.tab==="bible" && state.bview!=="read"){ state.bview="read"; state.sel=null; render(); return; }
+  if(state.tab==="devotion" && state.devMode==="plan"){ state.devMode="today"; render(); return; }
+  if(state.tab==="card"){ state.tab=state.returnTab||"bible"; render(); return; }
+  if(state.tab==="settings"){ state.tab=state.returnTab||"devotion"; render(); return; }
+}
+
 function screenHTML(){
   switch(state.tab){
     case "devotion": return devotionView();
@@ -1389,6 +1480,7 @@ function screenHTML(){
 
 function render(){
   applyTheme();
+  var back=$("globalBack"); if(back) back.hidden=!backAvailable();
   var scr=$("screen");
   var keepScroll=(state.tab==="bible" && state.bview==="read") ? scr.scrollTop : 0;
   scr.innerHTML=screenHTML();
@@ -1417,8 +1509,16 @@ function wire(scr){
   if(w) w.onclick=function(){ markWalk(); render(); };
 
   on(scr,"[data-go]",function(b){
-    b.onclick=function(){ state.tab=b.dataset.go; render(); };
+    b.onclick=function(){
+      var next=b.dataset.go;
+      if(next==="settings") state.returnTab=state.tab;
+      if(state.tab==="notes" && next!=="notes") saveOpenNote();
+      state.tab=next;
+      if(next!=="notes"){ state.noteId=null; state.notePreview=false; }
+      render();
+    };
   });
+  on(scr,"[data-appback]",function(b){ b.onclick=appBack; });
   on(scr,"[data-dev]",function(b){
     b.onclick=function(){ state.devMode=b.dataset.dev; if(state.devMode==="today" && (state.heroIndex<0 || state.heroIndex>=HERO_IMAGES.length)) state.heroIndex=baseHeroIndex(); render(); };
   });
@@ -1518,10 +1618,14 @@ function wire(scr){
     state.searchQuery=inp?inp.value.trim():"";
     render();
   };
-  var notesEditor=$("notesEditor");
-  if(notesEditor){
-    notesEditor.oninput=function(){ saveNoteValue(state.noteSection, notesEditor.value); };
-  }
+  var notesEditor=$("notesEditor"), noteTitle=$("noteTitle");
+  if(notesEditor) notesEditor.oninput=saveOpenNote;
+  if(noteTitle) noteTitle.oninput=saveOpenNote;
+  on(scr,"[data-prayertext]",function(t){
+    var grow=function(){ t.style.height="auto"; t.style.height=Math.max(96,t.scrollHeight)+"px"; };
+    grow();
+    t.oninput=function(){ savePrayer(t.dataset.prayertext,t.value); grow(); };
+  });
   var versionSelect=$("versionSelect");
   if(versionSelect){
     versionSelect.onchange=function(){
@@ -1537,23 +1641,26 @@ function wire(scr){
     b.onclick=function(){ state.historyTab=b.dataset.history; render(); };
   });
   on(scr,"[data-notesection]",function(b){
-    b.onclick=function(){ state.noteSection=b.dataset.notesection; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
+    b.onclick=function(){ saveOpenNote(); state.noteSection=b.dataset.notesection; state.noteId=null; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
+  });
+  on(scr,"[data-notenew]",function(b){
+    b.onclick=function(){ var doc=createDoc(b.dataset.notenew); state.noteSection=b.dataset.notenew; state.noteId=doc.id; state.notePreview=false; render(); setTimeout(function(){var t=$("noteTitle");if(t)t.focus();},20); };
+  });
+  on(scr,"[data-noteopen]",function(b){ b.onclick=function(){ state.noteId=b.dataset.noteopen; state.notePreview=false; render(); }; });
+  on(scr,"[data-noteback]",function(b){ b.onclick=function(){ saveOpenNote(); state.noteId=null; state.notePreview=false; render(); }; });
+  on(scr,"[data-notesave]",function(b){ b.onclick=function(){ saveOpenNote(); state.noteId=null; state.notePreview=false; toast("Note saved"); render(); }; });
+  on(scr,"[data-notedelete]",function(b){
+    b.onclick=function(){
+      if(b.dataset.armed){ deleteDoc(state.noteSection,b.dataset.notedelete); state.noteId=null; state.notePreview=false; toast("Note deleted"); render(); }
+      else { b.dataset.armed="1"; b.textContent="DELETE?"; }
+    };
   });
   on(scr,"[data-md]",function(b){ b.onclick=function(){ applyMarkdownAction(b.dataset.md); }; });
-  on(scr,"[data-notepreview]",function(b){
-    b.onclick=function(){
-      var ta=$("notesEditor");
-      if(ta) saveNoteValue(state.noteSection, ta.value);
-      state.notePreview=!state.notePreview;
-      render();
-    };
-  });
-  on(scr,"[data-notecopy]",function(b){
-    b.onclick=function(){
-      var val=noteValue(state.noteSection);
-      if(navigator.clipboard) navigator.clipboard.writeText(val).then(function(){ toast("Copied markdown"); });
-      else toast("Copy isn't available here");
-    };
+  on(scr,"[data-notepreview]",function(b){ b.onclick=function(){ saveOpenNote(); state.notePreview=!state.notePreview; render(); }; });
+  on(scr,"[data-prayernew]",function(b){ b.onclick=function(){ var item=createPrayer(); render(); setTimeout(function(){var t=document.querySelector('[data-prayertext="'+item.id+'"]');if(t)t.focus();},20); }; });
+  on(scr,"[data-prayertoggle]",function(b){ b.onclick=function(){ togglePrayer(b.dataset.prayertoggle); render(); }; });
+  on(scr,"[data-prayerdelete]",function(b){
+    b.onclick=function(){ if(b.dataset.armed){ deletePrayer(b.dataset.prayerdelete); render(); } else { b.dataset.armed="1"; b.textContent="?"; } };
   });
   on(scr,"[data-clearhistory]",function(b){
     b.onclick=function(){
@@ -1651,7 +1758,7 @@ function wire(scr){
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), notes:notesVault(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
+      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), noteLibrary:noteLibrary(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -1664,7 +1771,7 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("activity",[]); jset("sectionNotes",{sermon:"",prayer:"",study:"",men:""});
+        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{});
         ls("streak","0"); ls("lastWalk","");
         Promise.all(TIERS.filter(function(t){return t.available;})
           .map(function(t){ return removeTier(t.id); }))
@@ -1933,15 +2040,20 @@ if(window.matchMedia){
 /* ---------- boot ---------- */
 [].forEach.call(document.querySelectorAll("nav button"),function(b){
   b.onclick=function(){
+    if(state.tab==="notes") saveOpenNote();
     state.tab=b.dataset.tab;
+    state.returnTab=state.tab;
     if(state.tab==="bible") state.bview="read";
+    if(state.tab!=="notes"){ state.noteId=null; state.notePreview=false; }
     if(state.tab==="podcast") logActivity("podcast","The Applied Word Podcast","Podcast tab");
     render();
   };
 });
 
+var globalBack=$("globalBack");
+if(globalBack) globalBack.onclick=appBack;
 var settingsBtn=$("settingsBtn");
-if(settingsBtn) settingsBtn.onclick=function(){ state.tab="settings"; render(); };
+if(settingsBtn) settingsBtn.onclick=function(){ if(state.tab==="notes") saveOpenNote(); state.returnTab=state.tab; state.tab="settings"; render(); };
 
 applyTheme();
 initSheet();

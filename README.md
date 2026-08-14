@@ -129,3 +129,12 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 - YLT: public-domain text by Robert Young.
 - KJV: public domain in the United States. Special Crown rights can apply to printed publication/import in the United Kingdom.
 - ASV/KJV/YLT app data files were normalized from the Scrollmapper Bible Databases plain-text editions into the same tagged verse format used by the BSB importer.
+
+## v22 design and notes update
+- Sermon Notes, Bible Study Notes, and Men’s Group Notes are now saved as separate titled documents with list previews and timestamps.
+- Prayer Requests are now unlimited-length list items with active/answered status.
+- The Markdown editor toolbar is a compact single-row ribbon.
+- Added persistent nested back navigation in the app header and logical back behavior for Settings, verse cards, Reading Plan, Bible subviews, categories, and note editors.
+- Stabilized the mobile viewport and increased all editable control font sizes to prevent iOS focus zoom and off-center layout shifts.
+- Unified cards, buttons, controls, spacing, and interactive states around the active theme.
+- The new structured notes library is included in app backup exports.

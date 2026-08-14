@@ -1014,3 +1014,163 @@ nav button span{font-size:6.9px;letter-spacing:.02em}
 .category-create-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:2px}
 .category-create-row input{min-width:0;padding:12px 13px;border-radius:12px;border:1px solid color-mix(in srgb,var(--brass) 14%,transparent);background:color-mix(in srgb,var(--raise) 64%,var(--ground));color:var(--bone);font-family:var(--slab);font-size:13px}
 .category-create-row button{padding:10px 14px;border:0;border-radius:12px;background:var(--brass);color:var(--forge);font-family:var(--util);font-size:8px;font-weight:700;letter-spacing:.06em}
+
+/* ============================================================
+   v22 POLISH PASS — stable viewport, titled notes, compact editor,
+   consistent controls, and tighter modern spacing
+   ============================================================ */
+:root{
+  --radius-card:15px;
+  --radius-control:11px;
+  --surface:color-mix(in srgb,var(--raise) 78%,var(--ground));
+  --surface-2:color-mix(in srgb,var(--ground) 86%,var(--forge));
+  --line:color-mix(in srgb,var(--brass) 12%,transparent);
+  --line-strong:color-mix(in srgb,var(--brass) 24%,transparent);
+}
+html{
+  width:100%;max-width:100%;overflow:hidden;overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;
+}
+body{
+  width:100%;min-width:0;max-width:480px;
+  height:100vh;height:100svh;min-height:100svh;max-height:100svh;
+  overflow:hidden;overscroll-behavior:none;
+}
+main{
+  width:100%;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;
+  overscroll-behavior-y:contain;overscroll-behavior-x:none;touch-action:pan-y;
+  scroll-behavior:auto;
+}
+.pad{width:100%;min-width:0;padding:17px 16px 30px}
+img,canvas,iframe{max-width:100%}
+button,a,input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+input,textarea,select{font-size:16px!important;max-width:100%;min-width:0}
+
+.app-header{min-height:70px;grid-template-columns:38px minmax(0,1fr) 38px;padding:calc(8px + env(safe-area-inset-top)) 14px 8px}
+.app-header .brand-kicker{color:var(--ash)}
+.app-header .wordmark,.app-header .brand-sub{color:var(--brass)}
+.app-header .brand-sub span{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--brass) 58%,transparent))}
+.app-header .brand-sub span:last-child{background:linear-gradient(90deg,color-mix(in srgb,var(--brass) 58%,transparent),transparent)}
+.app-header .icon-btn,.header-back{
+  width:36px;height:36px;border-radius:11px;border:1px solid var(--line);
+  background:color-mix(in srgb,var(--raise) 72%,transparent);color:var(--brass);
+  display:grid;place-items:center;padding:8px;box-shadow:0 6px 16px rgba(0,0,0,.10)
+}
+.header-back[hidden]{visibility:hidden;display:grid!important;pointer-events:none}
+.header-back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.screen-head{margin:2px 0 14px}
+.screen-title{font-size:29px;line-height:1.04;color:var(--bone)}
+.screen-subtitle{font-size:12.5px;color:var(--ash)}
+.feature-card,.content-card,.reader-shell,.podcast-showcase,.helper-card,.modern-walk,.tier,.library-card,.notes-shell{
+  border-radius:var(--radius-card);border-color:var(--line);box-shadow:0 9px 26px rgba(0,0,0,.13),inset 0 1px 0 rgba(255,255,255,.025)
+}
+.quick-card,.timeline-row,.saved-row,.search-result,.category-card,.category-pick,.setrow,.stream{
+  border-radius:var(--radius-control)!important;border-color:var(--line)!important
+}
+
+/* Unified control language */
+button,.cta,.tier-btn{transition:background .14s ease,border-color .14s ease,color .14s ease,transform .08s ease,filter .14s ease}
+button:active,.cta:active,.tier-btn:active{transform:translateY(1px)}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid color-mix(in srgb,var(--brass) 70%,white);outline-offset:2px}
+.backlink,.mini,.primary-mini,.primary-btn,.secondary-btn,.icon-text-btn,.icon-only-btn,.text-action{
+  text-decoration:none;border:1px solid var(--line-strong);border-radius:var(--radius-control);
+  background:color-mix(in srgb,var(--raise) 64%,transparent);color:var(--bone);
+  font-family:var(--util);font-weight:700;letter-spacing:.055em
+}
+.backlink{display:inline-flex;align-items:center;min-height:34px;padding:7px 10px;margin:0 0 12px;font-size:8px;color:var(--brass)}
+.mini,.primary-mini{min-height:34px;padding:8px 11px;font-size:7.5px}
+.primary-mini,.primary-btn{background:var(--brass);border-color:var(--brass);color:var(--forge)}
+.primary-btn{min-height:42px;padding:11px 15px;font-size:8.5px}
+.secondary-btn{min-height:42px;padding:10px 13px;font-size:8px}
+.secondary-btn.danger,.icon-only-btn.danger,.mini.danger{color:#e49a8b;border-color:rgba(228,154,139,.25);background:rgba(137,54,45,.10)}
+.icon-text-btn{min-height:30px;padding:6px 8px;font-size:6.5px;color:var(--brass)}
+.icon-only-btn{width:30px;height:30px;padding:0;display:grid;place-items:center;font-size:17px}
+
+/* Notes library */
+.notes-tabs{margin-top:0;display:grid;grid-template-columns:repeat(4,1fr)}
+.notes-tabs button{min-width:0;padding:9px 3px;font-size:6.7px;letter-spacing:.01em;white-space:nowrap}
+.notes-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:14px 0 10px;padding:0 1px}
+.notes-section-head p{margin-top:5px;max-width:280px;font-size:12px;line-height:1.45;color:var(--ash)}
+.notes-section-head .primary-mini{flex:0 0 auto;white-space:nowrap}
+.note-list{display:grid;gap:9px}
+.note-list-card{width:100%;text-align:left;padding:14px;border:1px solid var(--line);border-radius:var(--radius-card);background:linear-gradient(150deg,var(--surface),var(--surface-2));color:var(--bone);box-shadow:0 7px 20px rgba(0,0,0,.10)}
+.note-list-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.note-list-top b{font-family:var(--slab);font-size:14px;line-height:1.25;color:var(--bone)}
+.note-list-top small{flex:0 0 auto;font-family:var(--util);font-size:6.5px;letter-spacing:.04em;color:var(--ash)}
+.note-list-preview{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:8px;font-family:var(--slab);font-size:12.5px;line-height:1.48;color:var(--ash)}
+.note-list-meta{display:block;margin-top:10px;font-family:var(--util);font-size:6.5px;letter-spacing:.07em;color:var(--brass)}
+.nested-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.nested-topbar span{font-family:var(--util);font-size:6.5px;letter-spacing:.06em;color:var(--ash)}
+.compact-back{margin:0}
+.note-title-input{width:100%;height:48px;padding:0 13px;border-radius:var(--radius-control);border:1px solid var(--line-strong);background:var(--surface);color:var(--bone);font-family:var(--slab);font-weight:700;font-size:18px!important}
+.note-title-input::placeholder,.notes-editor::placeholder,.prayer-text::placeholder{color:color-mix(in srgb,var(--ash) 70%,transparent)}
+.compact-toolbar{
+  display:flex;flex-wrap:nowrap;gap:5px;margin:8px 0;padding:5px;
+  overflow-x:auto;scrollbar-width:none;border:1px solid var(--line);border-radius:var(--radius-control);
+  background:color-mix(in srgb,var(--ground) 72%,transparent)
+}
+.compact-toolbar::-webkit-scrollbar{display:none}
+.compact-toolbar button{
+  flex:1 0 34px;min-width:34px;height:32px;min-height:32px;padding:0;
+  display:grid;place-items:center;border-radius:8px;border:1px solid transparent;
+  background:transparent;color:var(--bone);font-family:var(--slab);font-size:11px
+}
+.compact-toolbar button:hover{background:color-mix(in srgb,var(--brass) 9%,transparent);border-color:var(--line)}
+.compact-toolbar button b,.compact-toolbar button i{font-size:13px}
+.notes-editor{width:100%;min-height:390px;padding:15px;border-radius:var(--radius-card);border:1px solid var(--line);background:color-mix(in srgb,var(--forge) 30%,var(--ground));color:var(--bone);font-family:var(--slab);font-size:16px!important;line-height:1.6;resize:none;overflow:auto}
+.notes-preview{min-height:390px;padding:15px;border-radius:var(--radius-card);border:1px solid var(--line);background:color-mix(in srgb,var(--forge) 30%,var(--ground))}
+.note-editor-actions{display:grid;grid-template-columns:auto auto 1fr;gap:7px;margin-top:9px}
+.note-editor-actions .primary-btn{width:100%}
+.notes-meta{margin-top:8px;font-size:6.7px;text-align:center}
+
+/* Prayer requests */
+.prayer-list{display:grid;gap:10px}
+.prayer-card{padding:11px;border-radius:var(--radius-card);border:1px solid var(--line);background:linear-gradient(150deg,var(--surface),var(--surface-2));box-shadow:0 7px 20px rgba(0,0,0,.09)}
+.prayer-card.answered{opacity:.76;border-color:color-mix(in srgb,#8fbd96 32%,transparent)}
+.prayer-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.prayer-card-head>span{font-family:var(--util);font-size:6.6px;letter-spacing:.06em;color:var(--ash)}
+.prayer-card-head>div{display:flex;gap:5px;align-items:center}
+.prayer-text{display:block;width:100%;min-height:96px;height:auto;padding:12px;border-radius:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--forge) 24%,var(--ground));color:var(--bone);font-family:var(--slab);font-size:16px!important;line-height:1.55;resize:none;overflow:hidden}
+.prayer-status{margin-top:8px;font-family:var(--util);font-size:7px;font-weight:700;letter-spacing:.08em;color:#9bc9a3}
+
+/* Stable, non-zooming overlays and forms */
+.category-panel,.install-panel,#sheet{max-width:calc(100vw - 20px)}
+.category-new-row input,.category-create-row input,.translation-row select,.planbar input,.bible-search input,#sheetNote{font-size:16px!important}
+.category-new-row,.category-create-row{min-width:0}
+.category-new-row>*{min-width:0}
+
+/* Tighter navigation and spacing */
+nav{min-height:63px}
+nav button{padding:7px 1px 8px;gap:2px}
+nav button i{width:27px;height:25px}
+nav button i svg{width:20px;height:20px}
+nav button span{font-size:6.7px;line-height:1}
+.content-card,.quick-card,.stream,.setrow{margin-top:10px}
+.grouphd{margin-top:20px}
+
+@media (max-width:390px){
+  .pad{padding-left:13px;padding-right:13px}
+  .notes-tabs button{font-size:6px;padding-left:1px;padding-right:1px}
+  .notes-section-head{gap:8px}
+  .notes-section-head p{font-size:11px}
+  .primary-mini{padding-left:8px;padding-right:8px}
+  .compact-toolbar{gap:3px;padding:4px}
+  .compact-toolbar button{min-width:31px;flex-basis:31px}
+  .note-editor-actions{grid-template-columns:1fr 1fr}.note-editor-actions .primary-btn{grid-column:1/-1}
+  nav button span{font-size:6.1px}
+}
+
+/* Final control normalization */
+#sheetClose,.install-close{
+  width:32px!important;height:32px!important;display:grid!important;place-items:center!important;
+  padding:0!important;border-radius:10px!important;border:1px solid var(--line)!important;
+  background:color-mix(in srgb,var(--raise) 72%,transparent)!important;color:var(--brass)!important;
+  font-size:18px!important;text-decoration:none!important
+}
+.reader-tools button,.readbar button,.translation-row button,.bible-search button,.category-create-row button,.category-new-row button,.selection-actions button,.verse-range-controls button{
+  border-radius:var(--radius-control)!important;
+}
+.selection-actions button{background:var(--surface);border-color:var(--line)!important}
+.category-panel,.install-panel{border-radius:18px;background:linear-gradient(180deg,var(--raise),var(--ground));border-color:var(--line-strong)}
+.empty{border-radius:var(--radius-card);border:1px solid var(--line);background:color-mix(in srgb,var(--ground) 68%,transparent);padding:20px 16px}
