@@ -101,3 +101,15 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 
 
 - v18: verse-card typography tightened to more closely match the supplied Roman-serif reference, with stronger weight, tighter leading, darker ink, and larger safe margins.
+
+
+## v19 updates
+- Expanded the daily devotional library to 365 entries (one for each day of the year).
+- Reworked devotional hero images around the Armor of God (Ephesians 6:10–18): belt, breastplate, shoes, shield, helmet, and sword.
+- Replaced oversized rotating images with optimized 900×600 JPG assets for smoother loading.
+
+
+## v20 updates
+- Swapped devotional hero artwork to new Armor of God image paths and overlaid matching Cinzel-styled captions with the related Ephesians 6 references.
+- Made the Reading Plan info card square and added spacing between the Spotify button and the Listen Anywhere box.
+- Added a full Notes section with Sermon Notes, Prayer Requests, Bible Study Notes, and Men’s Group Notes, including a markdown toolbar, preview mode, and export support.

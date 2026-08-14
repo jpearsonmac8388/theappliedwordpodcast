@@ -822,3 +822,48 @@ body[data-theme="slate"] .hero-rotator{background:linear-gradient(180deg,rgba(28
 .cardprev canvas{
   background:#f3e8d7;
 }
+
+
+/* v20 armor hero captions, notes workspace, and spacing tweaks */
+.hero-caption{position:absolute;left:14px;right:14px;bottom:14px;z-index:2;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.hero-title,.hero-ref{display:inline-block;padding:6px 10px;background:rgba(16,12,10,.52);backdrop-filter:blur(5px);border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 20px rgba(0,0,0,.18)}
+.hero-title{font-family:'Cinzel','Roboto Slab',Georgia,serif;font-size:16px;font-weight:800;letter-spacing:.04em;color:#f3e7cf;line-height:1.1}
+.hero-ref{font-family:'Cinzel','Roboto Slab',Georgia,serif;font-size:11px;font-weight:700;letter-spacing:.05em;color:#e7cf99}
+body[data-theme="midnight"] .hero-title,body[data-theme="midnight"] .hero-ref,
+body[data-theme="slate"] .hero-title,body[data-theme="slate"] .hero-ref{background:rgba(10,18,28,.58)}
+.square-card{border-radius:0!important;overflow:visible!important}
+.spotify-link{margin-top:14px;margin-bottom:16px}
+.listen-anywhere{margin-top:0}
+.podcast-page #player{margin-bottom:0}
+nav button span{font-size:7.6px}
+@media (max-width:390px){nav button span{font-size:7px}}
+
+.notes-tabs{margin-top:10px}
+.notes-shell{margin-top:14px;padding:14px}
+.notes-hint{margin-top:7px;margin-bottom:12px}
+.notes-toolbar{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.notes-toolbar button{min-height:34px;padding:8px 10px;border-radius:10px;border:1px solid rgba(228,195,116,.18);background:rgba(28,21,16,.38);color:var(--bone);font-family:var(--util);font-size:8px;font-weight:700;letter-spacing:.07em}
+.notes-toolbar button b,.notes-toolbar button i{font-size:12px}
+.notes-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px}
+.notes-editor{width:100%;min-height:360px;resize:vertical;border-radius:14px;border:1px solid rgba(228,195,116,.16);padding:14px;background:rgba(17,12,9,.28);color:var(--bone);font-family:var(--slab);font-size:14px;line-height:1.55}
+.notes-preview{min-height:320px;padding:16px 14px;border-radius:14px;border:1px solid rgba(228,195,116,.14);background:rgba(17,12,9,.20)}
+.notes-meta{margin-top:11px;font-family:var(--util);font-size:8px;letter-spacing:.11em;color:var(--ash)}
+.markdown-body h1,.markdown-body h2,.markdown-body h3{font-family:'Cinzel','Roboto Slab',Georgia,serif;color:var(--brass);margin:12px 0 8px}
+.markdown-body h1{font-size:19px}.markdown-body h2{font-size:17px}.markdown-body h3{font-size:15px}
+.markdown-body p,.markdown-body li,.markdown-body blockquote{font-size:14px;line-height:1.58;color:var(--bone)}
+.markdown-body p+p{margin-top:10px}
+.markdown-body ul,.markdown-body ol{padding-left:20px;margin:10px 0}
+.markdown-body ul.md-check{list-style:none;padding-left:0}
+.markdown-body ul.md-check li{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
+.markdown-body .box{width:18px;height:18px;flex:0 0 18px;border-radius:5px;border:1px solid rgba(228,195,116,.28);display:grid;place-items:center;color:var(--forge);background:rgba(255,255,255,.05);font-size:12px;margin-top:1px}
+.markdown-body .box.checked{background:var(--brass);border-color:var(--brass);color:var(--forge)}
+.markdown-body blockquote{margin:12px 0;padding:10px 12px;border-left:3px solid var(--brass);background:rgba(255,255,255,.03)}
+.markdown-body code{padding:2px 5px;border-radius:5px;background:rgba(255,255,255,.06);font-family:var(--mono);font-size:12px}
+.md-empty{color:var(--ash)}
+.notes-overview{margin-top:14px;padding:14px}
+.notes-overview-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+.note-mini-card{text-align:left;padding:12px;border-radius:12px;border:1px solid rgba(228,195,116,.12);background:rgba(28,21,16,.28);color:var(--bone)}
+.note-mini-card b{display:block;font-family:var(--slab);font-size:12px;color:var(--brass)}
+.note-mini-card span{display:block;margin-top:7px;font-family:var(--slab);font-size:12px;line-height:1.5;color:var(--bone)}
+body[data-theme="midnight"] .notes-toolbar button, body[data-theme="midnight"] .note-mini-card, body[data-theme="midnight"] .notes-preview, body[data-theme="midnight"] .notes-editor{background:rgba(18,28,42,.46)}
+body[data-theme="slate"] .notes-toolbar button, body[data-theme="slate"] .note-mini-card, body[data-theme="slate"] .notes-preview, body[data-theme="slate"] .notes-editor{background:rgba(34,46,57,.48)}

@@ -9,7 +9,22 @@ var THEMES = [
   {id:"midnight", name:"Blue Midnight", meta:"Lightweight navy minimal"},
   {id:"slate", name:"Slate", meta:"Clean graphite slate"}
 ];
-var HERO_IMAGES = [1,2,3,4,5,6,7,8,9,10].map(function(n){ return "assets/devotion-hero-"+n+".jpg"; });
+var HERO_IMAGES = [
+  "assets/hero-armor-belt.jpg",
+  "assets/hero-armor-breastplate.jpg",
+  "assets/hero-armor-feet.jpg",
+  "assets/hero-armor-shield.jpg",
+  "assets/hero-armor-helmet.jpg",
+  "assets/hero-armor-sword.jpg"
+];
+var HERO_META = [
+  { title:"BELT OF TRUTH", ref:"Ephesians 6:14" },
+  { title:"BREASTPLATE OF RIGHTEOUSNESS", ref:"Ephesians 6:14" },
+  { title:"FEET OF PEACE", ref:"Ephesians 6:15" },
+  { title:"SHIELD OF FAITH", ref:"Ephesians 6:16" },
+  { title:"HELMET OF SALVATION", ref:"Ephesians 6:17" },
+  { title:"SWORD OF THE SPIRIT", ref:"Ephesians 6:17" }
+];
 var heroTimer = null;
 var heroPreloads = HERO_IMAGES.map(function(src){ var im=new Image(); im.decoding="async"; im.src=src; return im; });
 var cardLogo = new Image();
@@ -65,6 +80,9 @@ function setHeroIndex(i, silent){
   if(next && next.complete) swap();
   else if(next) next.onload=swap;
   [].forEach.call(document.querySelectorAll('.hero-dot'), function(dot,ix){ dot.classList.toggle('on', ix===state.heroIndex); });
+  var meta=HERO_META[state.heroIndex] || null;
+  var titleEl=$("heroTitle"), refEl=$("heroRef");
+  if(meta){ if(titleEl) titleEl.textContent=meta.title; if(refEl) refEl.textContent=meta.ref; }
 }
 function stopHeroCycle(){ if(heroTimer){ clearInterval(heroTimer); heroTimer=null; } }
 function startHeroCycle(){
@@ -135,7 +153,10 @@ var state = {
   theme: ls("theme") || "classic",
   heroIndex: +(ls("heroIndex") || -1),
   // card
-  cardRatio: "9:16", cardVerse: null
+  cardRatio: "9:16", cardVerse: null,
+  // notes
+  noteSection: ls("noteSection") || "sermon",
+  notePreview: false
 };
 
 /* ---------- user marks ---------- */
@@ -159,6 +180,76 @@ function toggleBookmark(b,c){
   list.forEach(function(x,ix){ if(x.b===b&&x.c===c) i=ix; });
   if(i>-1){ list.splice(i,1); jset("bookmarks",list); return false; }
   list.unshift({b:b,c:c,at:Date.now()}); jset("bookmarks",list); return true;
+}
+
+/* ---------- section notes ---------- */
+var NOTE_SECTIONS=[
+  {id:"sermon", label:"SERMON NOTES", hint:"Capture key points, verses, and takeaways from a sermon."},
+  {id:"prayer", label:"PRAYER REQUESTS", hint:"Keep prayer needs, answers, and people you are interceding for."},
+  {id:"study", label:"BIBLE STUDY NOTES", hint:"Record observations, cross references, and study thoughts."},
+  {id:"men", label:"MEN’S GROUP NOTES", hint:"Track discussion points, accountability, and next steps."}
+];
+function notesVault(){
+  var base={sermon:"",prayer:"",study:"",men:""};
+  var saved=jget("sectionNotes",{});
+  Object.keys(base).forEach(function(k){ if(typeof saved[k]!=="string") saved[k]=base[k]; });
+  return saved;
+}
+function noteValue(id){ return notesVault()[id] || ""; }
+function saveNoteValue(id, val){
+  var all=notesVault();
+  all[id]=String(val||"");
+  jset("sectionNotes",all);
+}
+function totalSectionNoteChars(){
+  var all=notesVault(), n=0;
+  Object.keys(all).forEach(function(k){ n += (all[k]||"").trim().length; });
+  return n;
+}
+function renderMarkdown(src){
+  var text=esc(String(src||"").replace(/\r/g,""));
+  if(!text.trim()) return '<p class="md-empty">Nothing here yet. Start writing in the editor.</p>';
+  text=text.replace(/^### (.*)$/gm,'<h3>$1</h3>')
+           .replace(/^## (.*)$/gm,'<h2>$1</h2>')
+           .replace(/^# (.*)$/gm,'<h1>$1</h1>')
+           .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+           .replace(/\*(.+?)\*/g,'<em>$1</em>')
+           .replace(/`([^`]+)`/g,'<code>$1</code>');
+  var lines=text.split('\n');
+  var out=[], inUl=false, inOl=false;
+  function closeLists(){ if(inUl){ out.push('</ul>'); inUl=false; } if(inOl){ out.push('</ol>'); inOl=false; } }
+  lines.forEach(function(line){
+    if(/^\s*$/.test(line)){ closeLists(); return; }
+    var m;
+    if((m=line.match(/^\- \[ \] (.*)$/))){ if(inOl){ out.push('</ol>'); inOl=false; } if(!inUl){ out.push('<ul class="md-check">'); inUl=true; } out.push('<li><span class="box"></span><span>'+m[1]+'</span></li>'); return; }
+    if((m=line.match(/^\- \[x\] (.*)$/i))){ if(inOl){ out.push('</ol>'); inOl=false; } if(!inUl){ out.push('<ul class="md-check">'); inUl=true; } out.push('<li><span class="box checked">✓</span><span>'+m[1]+'</span></li>'); return; }
+    if((m=line.match(/^\- (.*)$/))){ if(inOl){ out.push('</ol>'); inOl=false; } if(!inUl){ out.push('<ul>'); inUl=true; } out.push('<li>'+m[1]+'</li>'); return; }
+    if((m=line.match(/^\d+\. (.*)$/))){ if(inUl){ out.push('</ul>'); inUl=false; } if(!inOl){ out.push('<ol>'); inOl=true; } out.push('<li>'+m[1]+'</li>'); return; }
+    closeLists();
+    if((m=line.match(/^&gt;\s?(.*)$/))){ out.push('<blockquote>'+m[1]+'</blockquote>'); return; }
+    out.push('<p>'+line+'</p>');
+  });
+  closeLists();
+  return out.join('');
+}
+function noteButtonLabel(){ return state.notePreview ? 'EDIT' : 'PREVIEW'; }
+function applyMarkdownAction(action){
+  var ta=$("notesEditor");
+  if(!ta) return;
+  var start=ta.selectionStart||0, end=ta.selectionEnd||0, val=ta.value||"", sel=val.slice(start,end), rep="";
+  switch(action){
+    case 'bold': rep='**'+(sel||'bold text')+'**'; break;
+    case 'italic': rep='*'+(sel||'italic text')+'*'; break;
+    case 'h2': rep='## '+(sel||'Section title'); break;
+    case 'bullet': rep='- '+(sel||'List item'); break;
+    case 'check': rep='- [ ] '+(sel||'Checklist item'); break;
+    case 'quote': rep='> '+(sel||'Quoted note'); break;
+    case 'verse': rep='**Scripture:** '+(sel||'Book 1:1'); break;
+    default: return;
+  }
+  ta.setRangeText(rep,start,end,'end');
+  ta.focus();
+  saveNoteValue(state.noteSection, ta.value);
 }
 
 /* ---------- streak ---------- */
@@ -242,6 +333,7 @@ function devotionView(){
   var title=dev.title[0]+" "+dev.title[1];
   var dateLine=d.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
   var heroIx=currentHeroIndex();
+  var heroMeta=HERO_META[heroIx] || {title:"ARMOR OF GOD", ref:"Ephesians 6"};
 
   return '<div class="pad home-page">'+
     screenHead("Today", dateLine)+
@@ -254,6 +346,7 @@ function devotionView(){
         '<img id="devHeroImg" src="'+heroImagePath()+'" alt="Biblical devotional scene">'+
         '<div class="hero-overlay"></div>'+
         '<div class="hero-badge">THE APPLIED WORD PODCAST</div>'+
+        '<div class="hero-caption"><div id="heroTitle" class="hero-title">'+esc(heroMeta.title)+'</div><div id="heroRef" class="hero-ref">'+esc(heroMeta.ref)+'</div></div>'+
       '</div>'+
       '<div class="feature-content">'+
         '<div class="feature-kicker">DAILY DEVOTIONAL</div>'+
@@ -502,8 +595,8 @@ function podcastView(){
     '</div>'+
     '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" '+
       'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
-    '<a class="cta" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
-    '<div class="content-card helper-card listen-anywhere"><div class="content-kicker">LISTEN ANYWHERE</div>'+
+    '<a class="cta spotify-link" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
+    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div>'+
       '<p class="muted">If the embedded player is blocked by the browser, open the show in Spotify with the button above.</p></div>'+
     '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
@@ -555,7 +648,7 @@ function plansView(){
       '<button data-dev="today">TODAY</button>'+
       '<button class="on" data-dev="plan">READING PLAN</button>'+
     '</div>'+
-    '<div class="content-card helper-card" style="margin-top:14px"><p class="muted">Robert Murray M’Cheyne wrote this calendar for his church in Dundee in December 1842. Four chapters a day — two to read aloud with the house, two on your own.</p></div>'+
+    '<div class="content-card helper-card square-card" style="margin-top:14px"><p class="muted">Robert Murray M’Cheyne wrote this calendar for his church in Dundee in December 1842. Four chapters a day — two to read aloud with the house, two on your own.</p></div>'+
     '<div class="planbar"><input type="date" id="planDate" value="'+state.planDate+'"></div>'+
     body+
     '<div class="foot">PUBLIC DOMAIN · ST. PETER’S, DUNDEE, 1842</div></div>';
@@ -826,6 +919,40 @@ function listView(){
       '<button class="'+(t==="bookmarks"?"on":"")+'" data-list="bookmarks">BOOKMARKS</button>'+
     '</div><div style="margin-top:10px">'+rows+'</div></div>';
 }
+function notesView(){
+  var sec=NOTE_SECTIONS.filter(function(x){ return x.id===state.noteSection; })[0] || NOTE_SECTIONS[0];
+  var val=noteValue(sec.id);
+  return '<div class="pad notes-page">'+
+    screenHead("Notes","Markdown note sections saved on this device")+
+    '<div class="tabsel notes-tabs">'+NOTE_SECTIONS.map(function(s){ return '<button class="'+(s.id===sec.id?'on':'')+'" data-notesection="'+s.id+'">'+s.label.replace(' NOTES','')+'</button>'; }).join('')+'</div>'+
+    '<div class="content-card notes-shell">'+
+      '<div class="content-kicker">'+sec.label+'</div>'+
+      '<p class="muted notes-hint">'+sec.hint+'</p>'+
+      '<div class="notes-toolbar">'+
+        '<button type="button" data-md="bold"><b>B</b></button>'+
+        '<button type="button" data-md="italic"><i>I</i></button>'+
+        '<button type="button" data-md="h2">H2</button>'+
+        '<button type="button" data-md="bullet">• LIST</button>'+
+        '<button type="button" data-md="check">☑ CHECK</button>'+
+        '<button type="button" data-md="quote">❝ QUOTE</button>'+
+        '<button type="button" data-md="verse">VERSE</button>'+
+      '</div>'+
+      '<div class="notes-actions">'+
+        '<button class="mini" data-notepreview="1">'+noteButtonLabel()+'</button>'+
+        '<button class="mini" data-notecopy="1">COPY MD</button>'+
+      '</div>'+
+      (state.notePreview
+        ? '<div class="notes-preview markdown-body">'+renderMarkdown(val)+'</div>'
+        : '<textarea id="notesEditor" class="notes-editor" placeholder="Write in markdown…">'+esc(val)+'</textarea>')+
+      '<div class="notes-meta">MARKDOWN SUPPORTED · INCLUDED IN APP EXPORTS</div>'+
+    '</div>'+
+    '<div class="content-card helper-card notes-overview">'+
+      '<div class="content-kicker">SECTION OVERVIEW</div>'+
+      '<div class="notes-overview-grid">'+NOTE_SECTIONS.map(function(s){ var txt=noteValue(s.id); return '<button class="note-mini-card" data-notesection="'+s.id+'"><b>'+s.label+'</b><span>'+esc(snip(txt||'Start writing in this section.',70))+'</span></button>'; }).join('')+'</div>'+
+    '</div>'+
+    '<div class="foot">SERMON · PRAYER · STUDY · MEN’S GROUP</div></div>';
+}
+
 function emptyBox(h,p){
   return '<div class="empty"><h4>'+h+'</h4><p>'+p+'</p></div>';
 }
@@ -1061,14 +1188,17 @@ function settingsView(){
         : '<button class="tier-btn" data-dl="bsb">DOWNLOAD BSB</button>')+
     '</div>'+
     '<div class="grouphd" style="margin-top:30px">YOUR DATA</div>'+
-    '<div class="setrow"><div><div class="lbl">Highlights, notes &amp; bookmarks</div>'+
-      '<div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' bookmarks</div></div>'+
+    '<div class="setrow"><div><div class="lbl">Highlights, Bible notes &amp; bookmarks</div>'+
+      '<div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' bookmarks · '+NOTE_SECTIONS.filter(function(s){ return !!noteValue(s.id).trim(); }).length+' note sections used</div></div>'+
       '<button class="mini" data-export="1">EXPORT</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Section notes</div>'+
+      '<div class="sub">'+totalSectionNoteChars().toLocaleString()+' characters across sermon, prayer, Bible study, and men’s group notes.</div></div>'+
+      '<button class="mini" data-go="notes">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Activity history</div>'+
       '<div class="sub">'+activity().length+' recent actions saved on this device.</div></div>'+
       '<button class="mini" data-clearhistory="1">CLEAR</button></div>'+
     '<div class="setrow"><div><div class="lbl">Reset app data</div>'+
-      '<div class="sub">Removes marks, bookmarks, activity, streaks, and the downloaded Bible copy.</div></div>'+
+      '<div class="sub">Removes highlights, Bible notes, section notes, bookmarks, activity, streaks, and the downloaded Bible copy.</div></div>'+
       '<button class="mini" data-wipe="1" style="color:var(--rust);border-color:rgba(209,169,78,.4)">RESET</button></div>'+
     '<div class="foot">PUBLIC DOMAIN BIBLE TEXT · READING DATA STAYS LOCAL</div></div>';
 }
@@ -1118,6 +1248,7 @@ function screenHTML(){
     case "devotion": return devotionView();
     case "podcast":  return podcastView();
     case "bible":    return bibleView();
+    case "notes":    return notesView();
     case "history":  return historyView();
     case "card":     return cardView();
     case "settings": return settingsView();
@@ -1253,10 +1384,33 @@ function wire(scr){
     state.searchQuery=inp?inp.value.trim():"";
     render();
   };
+  var notesEditor=$("notesEditor");
+  if(notesEditor){
+    notesEditor.oninput=function(){ saveNoteValue(state.noteSection, notesEditor.value); };
+  }
 
   // History
   on(scr,"[data-history]",function(b){
     b.onclick=function(){ state.historyTab=b.dataset.history; render(); };
+  });
+  on(scr,"[data-notesection]",function(b){
+    b.onclick=function(){ state.noteSection=b.dataset.notesection; state.notePreview=false; ls("noteSection", state.noteSection); render(); };
+  });
+  on(scr,"[data-md]",function(b){ b.onclick=function(){ applyMarkdownAction(b.dataset.md); }; });
+  on(scr,"[data-notepreview]",function(b){
+    b.onclick=function(){
+      var ta=$("notesEditor");
+      if(ta) saveNoteValue(state.noteSection, ta.value);
+      state.notePreview=!state.notePreview;
+      render();
+    };
+  });
+  on(scr,"[data-notecopy]",function(b){
+    b.onclick=function(){
+      var val=noteValue(state.noteSection);
+      if(navigator.clipboard) navigator.clipboard.writeText(val).then(function(){ toast("Copied markdown"); });
+      else toast("Copy isn't available here");
+    };
   });
   on(scr,"[data-clearhistory]",function(b){
     b.onclick=function(){
@@ -1314,7 +1468,7 @@ function wire(scr){
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), activity:activity(), exported:new Date().toISOString() };
+      var data={ marks:marks(), bookmarks:bookmarks(), notes:notesVault(), plandone:planDone(), activity:activity(), theme:state.theme, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -1327,7 +1481,7 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("plandone",{}); jset("activity",[]);
+        jset("marks",{}); jset("bookmarks",[]); jset("plandone",{}); jset("activity",[]); jset("sectionNotes",{sermon:"",prayer:"",study:"",men:""});
         ls("streak","0"); ls("lastWalk","");
         Promise.all(TIERS.filter(function(t){return t.available;})
           .map(function(t){ return removeTier(t.id); }))
