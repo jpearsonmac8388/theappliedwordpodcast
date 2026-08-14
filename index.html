@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Applied Word Podcast — Daily Devotional & Bible</title>
-<meta name="description" content="Sharpening the man through the Message. A daily devotional for men, the weekly podcast, and the Berean Standard Bible.">
-<meta name="theme-color" content="#1E140C">
+<title>The Applied Word Podcast — Devotional, Podcast &amp; Bible</title>
+<meta name="description" content="The Applied Word Podcast: a devotional for men, the weekly podcast, and an offline Berean Standard Bible reader.">
+<meta name="theme-color" content="#1B1510">
 
 <meta property="og:title" content="The Applied Word Podcast">
-<meta property="og:description" content="Sharpening the man through the Message. A daily devotional for men.">
+<meta property="og:description" content="Sharpening the man through the Message.">
 <meta property="og:image" content="icons/social-card.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -18,61 +18,98 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Applied Word">
+<meta name="apple-mobile-web-app-title" content="The Applied Word Podcast">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700;900&family=Lora:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700;900&family=Cinzel:wght@500;700;800&family=Lora:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
 <div id="ember"></div>
 
-<header>
-  <div class="wordmark">THE <b>APPLIED WORD PODCAST</b></div>
-  <div class="streak"><i class="flame"></i> <span id="streakN">0</span> DAYS</div>
+<header class="app-header">
+  <div class="header-spacer" aria-hidden="true"></div>
+  <div class="brand-stack" aria-label="The Applied Word Podcast">
+    <div class="brand-kicker">THE</div>
+    <div class="wordmark">APPLIED WORD</div>
+    <div class="brand-sub"><span></span>PODCAST<span></span></div>
+  </div>
+  <button id="settingsBtn" class="icon-btn" aria-label="Open settings" title="Settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="M19 13.2v-2.4l-2-.6a7.7 7.7 0 0 0-.7-1.6l1-1.9-1.7-1.7-1.9 1a7.7 7.7 0 0 0-1.6-.7l-.6-2H9.1l-.6 2a7.7 7.7 0 0 0-1.6.7L5 5 3.3 6.7l1 1.9a7.7 7.7 0 0 0-.7 1.6l-2 .6v2.4l2 .6c.2.6.4 1.1.7 1.6l-1 1.9L5 19l1.9-1c.5.3 1 .5 1.6.7l.6 2h2.4l.6-2c.6-.2 1.1-.4 1.6-.7l1.9 1 1.7-1.7-1-1.9c.3-.5.5-1 .7-1.6l2-.6Z"/></svg>
+  </button>
 </header>
 
-<main id="screen"></main>
+<main id="screen" aria-live="polite"></main>
 
-<nav>
-  <button data-tab="devotion" class="on"><i>&#10022;</i><span>DEVOTION</span></button>
-  <button data-tab="bible"><i>&#9636;</i><span>BIBLE</span></button>
-  <button data-tab="plans"><i>&#9783;</i><span>Reading Plan</span></button>
-  <button data-tab="marks"><i>&#9998;</i><span>MARGIN</span></button>
-  <button data-tab="settings"><i>&#9881;</i><span>SETTINGS</span></button>
+<nav aria-label="Primary navigation">
+  <button data-tab="devotion" class="on">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.2c3.6-.8 6.3-.2 8.5 1.7v12c-2.2-1.8-4.9-2.4-8.5-1.6V5.2Z"/><path d="M20.5 5.2c-3.6-.8-6.3-.2-8.5 1.7v12c2.2-1.8 4.9-2.4 8.5-1.6V5.2Z"/></svg></i><span>DEVOTION</span>
+  </button>
+  <button data-tab="podcast">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></svg></i><span>PODCAST</span>
+  </button>
+  <button data-tab="bible">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.2c3.6-.8 6.3-.2 8.5 1.7v12c-2.2-1.8-4.9-2.4-8.5-1.6V5.2Z"/><path d="M20.5 5.2c-3.6-.8-6.3-.2-8.5 1.7v12c2.2-1.8 4.9-2.4 8.5-1.6V5.2Z"/><path d="M9 10.2h2.2M10.1 9.1v2.2"/></svg></i><span>BIBLE</span>
+  </button>
+  <button data-tab="history">
+    <i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3.4 2"/></svg></i><span>HISTORY</span>
+  </button>
 </nav>
 
 <div id="scrim"></div>
-<div id="sheet">
+<div id="sheet" role="dialog" aria-modal="true" aria-label="Verse actions">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
     <div class="sref" id="sheetRef">—</div>
     <button id="sheetClose" style="background:transparent;border:0;color:var(--ash);
-      font-size:17px;padding:2px 6px;cursor:pointer">&times;</button>
+      font-size:20px;padding:2px 6px;cursor:pointer" aria-label="Close">&times;</button>
   </div>
   <div class="stext" id="sheetText"></div>
 
-  <div class="swatches">
-    <div class="sw" data-c="gold"></div>
-    <div class="sw" data-c="rust"></div>
-    <div class="sw" data-c="green"></div>
-    <div class="sw" data-c="blue"></div>
-    <div class="sw" data-c="violet"></div>
-    <div class="sw none" data-c="">&#8709;</div>
+  <div class="verse-range-controls" aria-label="Select adjacent verses">
+    <button id="sheetPrevVerse" type="button">− PREVIOUS</button>
+    <button id="sheetRange" type="button" title="Reset to the first verse">1 VERSE</button>
+    <button id="sheetNextVerse" type="button">+ NEXT</button>
   </div>
 
-  <div class="sheet-acts">
+  <div class="swatches" aria-label="Highlight color">
+    <div class="sw" data-c="gold" title="Gold"></div>
+    <div class="sw" data-c="rust" title="Rust"></div>
+    <div class="sw" data-c="green" title="Green"></div>
+    <div class="sw" data-c="blue" title="Blue"></div>
+    <div class="sw" data-c="violet" title="Violet"></div>
+    <div class="sw none" data-c="" title="Clear highlight">&#8709;</div>
+  </div>
+
+  <div class="sheet-acts four">
     <button id="sheetNoteBtn">&#9998; NOTE</button>
-    <button id="sheetCardBtn">&#9634; MAKE CARD</button>
+    <button id="sheetShareBtn">&#8599; SHARE</button>
+    <button id="sheetCardBtn">&#9634; CARD</button>
     <button id="sheetCopyBtn">&#10064; COPY</button>
   </div>
-  <button id="sheetMultiBtn" class="sheet-multi-btn">&#9776; SELECT MORE VERSES</button>
 
   <textarea id="sheetNote" placeholder="What did you see in this verse?"></textarea>
 </div>
 
-<div id="toast"></div>
+<button id="installFab" class="install-fab" type="button" aria-label="Install The Applied Word Podcast" hidden>
+  <span class="install-fab-icon" aria-hidden="true">↓</span>
+  <span>INSTALL APP</span>
+  <span id="installFabClose" class="install-fab-close" role="button" aria-label="Dismiss install button">×</span>
+</button>
+
+<div id="installOverlay" class="install-overlay" hidden>
+  <section id="installPanel" class="install-panel" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+    <div class="install-panel-head">
+      <img src="icons/icon-192.png" alt="" class="install-panel-icon">
+      <div><div class="install-eyebrow">THE APPLIED WORD PODCAST</div><h2 id="installTitle">Install this app</h2></div>
+      <button id="installClose" class="install-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="installGuide" class="install-guide"></div>
+  </section>
+</div>
+
+<div id="toast" role="status"></div>
 
 <script src="content.js"></script>
 <script src="mcheyne.js"></script>
