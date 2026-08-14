@@ -758,3 +758,35 @@ nav button span{font-family:var(--slab);font-size:8.5px;font-weight:500;letter-s
   .reader-tools{grid-template-columns:1fr 47px 47px 42px}
   .install-fab{right:10px}
 }
+
+
+/* v14 themes and hero rotation */
+body[data-theme="classic"]{--forge:#1E140C;--ground:#37271A;--raise:#4A3524;--rust:#D1A94E;--brass:#E4C374;--bone:#F0E4CC;--ash:#B79A78;--hl-gold:#D4AF37;--hl-rust:#A85D3F;--hl-green:#7A8B5A;--hl-blue:#5C7A8A;--hl-violet:#7A5C74;}
+body[data-theme="midnight"]{--forge:#0f1a2a;--ground:#172435;--raise:#203248;--rust:#6fa0d7;--brass:#a8d4ff;--bone:#edf4ff;--ash:#98abc4;--hl-gold:#d6b56f;--hl-rust:#8f6a50;--hl-green:#6d957d;--hl-blue:#6e9fd4;--hl-violet:#7f87b7;}
+body[data-theme="slate"]{--forge:#1a232e;--ground:#26313d;--raise:#33404f;--rust:#8ea0b2;--brass:#d5deea;--bone:#f3f6f9;--ash:#aeb8c2;--hl-gold:#c7b07a;--hl-rust:#9f7d66;--hl-green:#779186;--hl-blue:#7f9bb4;--hl-violet:#8f84a2;}
+body[data-theme="midnight"] #ember{background:radial-gradient(ellipse 70% 100% at 50% 0%,rgba(96,149,211,.16),transparent 70%)}
+body[data-theme="slate"] #ember{background:radial-gradient(ellipse 70% 100% at 50% 0%,rgba(174,190,209,.13),transparent 70%)}
+.theme-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.theme-card{width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:14px 12px;background:linear-gradient(155deg,rgba(53,40,31,.92),rgba(37,28,23,.92));border:1px solid rgba(224,194,122,.14);border-radius:16px;color:var(--bone)}
+.theme-card b{display:block;font-family:var(--slab);font-size:14px}
+.theme-card small{display:block;margin-top:3px;color:var(--ash);font-family:var(--util);font-size:8px;letter-spacing:.08em}
+.theme-card.on{border-color:rgba(228,195,116,.5);box-shadow:0 0 0 1px rgba(228,195,116,.16) inset}
+.theme-swatch{width:42px;height:42px;border-radius:12px;flex:0 0 42px;border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.theme-swatch.classic{background:linear-gradient(160deg,#2d1d13,#4a3524 55%,#d1a94e)}
+.theme-swatch.midnight{background:linear-gradient(160deg,#0f1a2a,#203248 55%,#8ec5ff)}
+.theme-swatch.slate{background:linear-gradient(160deg,#1a232e,#33404f 55%,#c5d0db)}
+.hero-rotator{position:relative;overflow:hidden;background:rgba(0,0,0,.12)}
+.hero-rotator img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .45s ease, transform 4s ease;transform:scale(1.02)}
+.hero-rotator img.swap{opacity:.86;animation:heroSwap .55s ease 1}
+@keyframes heroSwap{0%{opacity:.4;transform:scale(1.05)}100%{opacity:1;transform:scale(1.02)}}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(22,17,13,.08),rgba(22,17,13,.1) 44%,rgba(22,17,13,.44) 100%)}
+.hero-badge{position:absolute;top:12px;left:12px;padding:8px 10px;border-radius:999px;background:rgba(16,14,12,.34);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);font-family:var(--util);font-size:8px;letter-spacing:.12em;color:var(--bone)}
+.hero-dots{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:12px}
+.hero-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.24)}
+.hero-dot.on{background:var(--brass);box-shadow:0 0 0 3px rgba(228,195,116,.12)}
+body[data-theme="midnight"] .theme-card, body[data-theme="midnight"] .quick-card, body[data-theme="midnight"] .feature-card, body[data-theme="midnight"] .content-card, body[data-theme="midnight"] .reader-shell, body[data-theme="midnight"] .podcast-showcase, body[data-theme="midnight"] .helper-card, body[data-theme="midnight"] .modern-walk{background:linear-gradient(155deg,rgba(23,36,53,.95),rgba(13,24,38,.96));}
+body[data-theme="midnight"] .reader-search-btn, body[data-theme="midnight"] .readbar button{background:rgba(25,40,59,.8)}
+body[data-theme="midnight"] nav{background:linear-gradient(180deg,rgba(17,26,42,.98),rgba(14,22,35,.98))}
+body[data-theme="slate"] .theme-card, body[data-theme="slate"] .quick-card, body[data-theme="slate"] .feature-card, body[data-theme="slate"] .content-card, body[data-theme="slate"] .reader-shell, body[data-theme="slate"] .podcast-showcase, body[data-theme="slate"] .helper-card, body[data-theme="slate"] .modern-walk{background:linear-gradient(155deg,rgba(38,49,61,.95),rgba(26,35,46,.96));}
+body[data-theme="slate"] .reader-search-btn, body[data-theme="slate"] .readbar button{background:rgba(44,58,72,.82)}
+body[data-theme="slate"] nav{background:linear-gradient(180deg,rgba(30,40,50,.98),rgba(24,33,41,.98))}

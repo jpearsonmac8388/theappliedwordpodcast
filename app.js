@@ -4,6 +4,16 @@
 
 var SHOW_URL  = "https://open.spotify.com/show/75QaXUSGooCOG8oqKhuNmG";
 var EMBED_URL = "https://open.spotify.com/embed/show/75QaXUSGooCOG8oqKhuNmG?utm_source=generator&theme=0";
+var THEMES = [
+  {id:"classic", name:"Classic", meta:"Leather & gold"},
+  {id:"midnight", name:"Blue Midnight", meta:"Lightweight navy minimal"},
+  {id:"slate", name:"Slate", meta:"Clean graphite slate"}
+];
+var HERO_IMAGES = [1,2,3,4,5,6,7,8,9,10].map(function(n){ return "assets/devotion-hero-"+n+".png"; });
+var heroTimer = null;
+var cardLogo = new Image();
+cardLogo.src = "assets/verse-card-logo.jpg";
+cardLogo.onload = function(){ if(state.tab==="card") drawCard(); };
 
 /* ---------- small helpers ---------- */
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -23,6 +33,41 @@ function snip(s,n){
 function screenHead(title,subtitle){
   return '<div class="screen-head"><div class="screen-title">'+esc(title)+'</div>'+
     (subtitle?'<div class="screen-subtitle">'+esc(subtitle)+'</div>':'')+'</div>';
+}
+function getTheme(){
+  var id=state.theme || ls("theme") || "classic";
+  return THEMES.find(function(t){ return t.id===id; }) || THEMES[0];
+}
+function applyTheme(){
+  var id=(state && state.theme) || ls("theme") || "classic";
+  document.body.setAttribute("data-theme", id);
+  var meta=document.querySelector('meta[name="theme-color"]');
+  var colors={classic:'#1B1510', midnight:'#0f1a2a', slate:'#1a232e'};
+  if(meta) meta.setAttribute('content', colors[id] || colors.classic);
+}
+function baseHeroIndex(){ return (dayOfYear(today())-1) % HERO_IMAGES.length; }
+function currentHeroIndex(){
+  if(state.heroIndex<0 || state.heroIndex>=HERO_IMAGES.length) state.heroIndex=baseHeroIndex();
+  return state.heroIndex;
+}
+function heroImagePath(){ return HERO_IMAGES[currentHeroIndex()]; }
+function setHeroIndex(i, silent){
+  state.heroIndex=(i+HERO_IMAGES.length)%HERO_IMAGES.length;
+  ls('heroIndex', String(state.heroIndex));
+  var img=$('devHeroImg');
+  if(img){
+    img.classList.remove('swap');
+    img.src=HERO_IMAGES[state.heroIndex];
+    if(!silent){ void img.offsetWidth; img.classList.add('swap'); }
+  }
+  [].forEach.call(document.querySelectorAll('.hero-dot'), function(dot,ix){ dot.classList.toggle('on', ix===state.heroIndex); });
+}
+function stopHeroCycle(){ if(heroTimer){ clearInterval(heroTimer); heroTimer=null; } }
+function startHeroCycle(){
+  stopHeroCycle();
+  if(!(state.tab==='devotion' && state.devMode==='today')) return;
+  setHeroIndex(currentHeroIndex(), true);
+  heroTimer=setInterval(function(){ setHeroIndex(state.heroIndex+1); }, 5200);
 }
 
 function ls(k,v){
@@ -62,6 +107,8 @@ var state = {
   planDate: stampOf(new Date()),
   // history
   historyTab: "activity",
+  theme: ls("theme") || "classic",
+  heroIndex: +(ls("heroIndex") || -1),
   // card
   cardRatio: "9:16", cardVerse: null
 };
@@ -169,51 +216,49 @@ function devotionView(){
   var done=walkedToday();
   var title=dev.title[0]+" "+dev.title[1];
   var dateLine=d.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+  var heroIx=currentHeroIndex();
 
   return '<div class="pad home-page">'+
     screenHead("Today", dateLine)+
-
     '<div class="tabsel devotion-tabs devotion-switch">'+
       '<button class="'+(state.devMode==="today"?"on":"")+'" data-dev="today">TODAY</button>'+
       '<button class="'+(state.devMode==="plan"?"on":"")+'" data-dev="plan">PLAN</button>'+
     '</div>'+
-
     '<div class="feature-card devotion-feature">'+
-      '<div class="feature-media dawn"></div>'+
+      '<div class="feature-media hero-rotator">'+
+        '<img id="devHeroImg" src="'+heroImagePath()+'" alt="Biblical devotional scene">'+
+        '<div class="hero-overlay"></div>'+
+        '<div class="hero-badge">THE APPLIED WORD PODCAST</div>'+
+      '</div>'+
       '<div class="feature-content">'+
         '<div class="feature-kicker">DAILY DEVOTIONAL</div>'+
         '<div class="feature-title">'+esc(title)+'</div>'+
         '<div class="feature-refline">'+esc(dev.ref)+' · BSB</div>'+
         '<div class="feature-text">'+esc(snip(dev.verse,170))+'</div>'+
+        '<div class="hero-dots">'+HERO_IMAGES.map(function(_,ix){ return '<span class="hero-dot'+(ix===heroIx?' on':'')+'"></span>'; }).join('')+'</div>'+
       '</div>'+
     '</div>'+
-
     '<div class="quick-grid">'+
       '<button class="quick-card" data-openref="'+esc(dev.ref)+'">'+
         '<span class="quick-ico">▤</span><span><b>Read the chapter</b><small>'+esc(dev.ref)+'</small></span></button>'+
       '<button class="quick-card" data-cardref="'+esc(dev.ref)+'">'+
         '<span class="quick-ico">□</span><span><b>Create verse image</b><small>Share to social</small></span></button>'+
     '</div>'+
-
     '<div class="content-card scripture-card">'+
       '<div class="content-kicker">TODAY&#39;S WORD</div>'+
       '<p class="verse">'+esc(dev.verse)+'</p>'+
       '<div class="ref" style="margin-top:14px">'+esc(dev.ref)+' · BSB</div>'+
     '</div>'+
-
     '<div class="content-card study-card"><div class="content-kicker">DEVOTIONAL</div>'+
       '<div class="body" style="margin-top:14px">'+
       dev.body.map(function(p){ return "<p>"+bold(p)+"</p>"; }).join("")+'</div></div>'+
-
     '<div class="carry modern-carry"><div class="tag">CARRY THIS</div><div class="line">'+dev.carry+'</div></div>'+
-
     '<div class="walk modern-walk"><h3>THE WALK</h3><p>'+esc(dev.walk)+'</p>'+
       (done
         ? '<div class="stamped"><div class="seal">&#10022; WALKED IT · DAY '+n+' &#10022;</div>'+
           '<div class="sub">'+getStreak()+'-DAY STREAK</div></div>'
         : '<button class="stamp-btn" id="walkBtn">MARK THE WALK DONE</button>')+
     '</div>'+
-
     '<div class="foot">THE APPLIED WORD PODCAST</div></div>';
 }
 
@@ -852,34 +897,10 @@ function drawCard(){
     x.quadraticCurveTo(x0,y0,x0+r,y0);
     x.closePath();
   }
-
   function seeded(i){
     var n=Math.sin(i*12.9898+78.233)*43758.5453;
     return n-Math.floor(n);
   }
-
-  function drawMark(cx,cy,s){
-    x.save();
-    x.translate(cx,cy);
-    x.strokeStyle="#A47B33";
-    x.lineCap="round"; x.lineJoin="round";
-    x.lineWidth=Math.max(2,s*.02);
-    x.beginPath();
-    x.moveTo(-s*.40,-s*.12); x.lineTo(-s*.18,-s*.24); x.lineTo(0,-s*.16); x.lineTo(s*.18,-s*.24); x.lineTo(s*.40,-s*.12);
-    x.lineTo(s*.40,s*.16); x.lineTo(0,s*.08); x.lineTo(-s*.40,s*.16); x.closePath();
-    x.stroke();
-    x.beginPath();
-    x.moveTo(0,-s*.48); x.lineTo(0,s*.02); x.stroke();
-    x.beginPath(); x.moveTo(-s*.12,-s*.30); x.lineTo(s*.12,-s*.30); x.stroke();
-    x.beginPath(); x.arc(0,-s*.18,s*.16,0,Math.PI*2); x.stroke();
-    x.beginPath(); x.moveTo(0,-s*.34); x.lineTo(s*.05,-s*.22); x.lineTo(s*.16,-s*.18); x.lineTo(s*.05,-s*.14); x.lineTo(0,-s*.02); x.lineTo(-s*.05,-s*.14); x.lineTo(-s*.16,-s*.18); x.lineTo(-s*.05,-s*.22); x.closePath(); x.stroke();
-    x.beginPath();
-    x.moveTo(-s*.26,s*.18); x.quadraticCurveTo(-s*.12,s*.04,-s*.01,s*.16); x.lineTo(-s*.01,s*.34); x.quadraticCurveTo(-s*.13,s*.24,-s*.26,s*.30); x.closePath();
-    x.moveTo(s*.26,s*.18); x.quadraticCurveTo(s*.12,s*.04,s*.01,s*.16); x.lineTo(s*.01,s*.34); x.quadraticCurveTo(s*.13,s*.24,s*.26,s*.30); x.closePath();
-    x.stroke();
-    x.restore();
-  }
-
   function wrappedLines(text,maxW,size,weight,style){
     x.font=(style||"")+" "+(weight||"400")+" "+size+"px 'Lora', Georgia, serif";
     var words=String(text).trim().split(/\s+/), lines=[], line="";
@@ -892,36 +913,33 @@ function drawCard(){
     return lines;
   }
 
-  // Light parchment background.
-  x.fillStyle="#efe3cc"; x.fillRect(0,0,W,H);
+  x.fillStyle="#f2e6d2"; x.fillRect(0,0,W,H);
   var paper=x.createLinearGradient(0,0,0,H);
-  paper.addColorStop(0,"rgba(255,249,238,.65)");
-  paper.addColorStop(.18,"rgba(233,221,197,.42)");
-  paper.addColorStop(.55,"rgba(228,214,185,.18)");
-  paper.addColorStop(1,"rgba(212,193,156,.32)");
+  paper.addColorStop(0,"rgba(255,250,242,.78)");
+  paper.addColorStop(.2,"rgba(241,229,205,.52)");
+  paper.addColorStop(.6,"rgba(228,213,182,.22)");
+  paper.addColorStop(1,"rgba(210,190,154,.34)");
   x.fillStyle=paper; x.fillRect(0,0,W,H);
-
-  for(var i=0;i<1600;i++){
+  for(var i=0;i<1900;i++){
     var rx=seeded(i*3)*W, ry=seeded(i*3+1)*H;
-    var alpha=.012+seeded(i*3+2)*.015;
-    x.fillStyle=(i%2?"rgba(255,255,255,":"rgba(135,110,78,")+alpha+")";
-    x.fillRect(rx,ry,1+seeded(i+50)*2.2,1+seeded(i+80)*1.4);
+    var alpha=.010+seeded(i*3+2)*.014;
+    x.fillStyle=(i%2?"rgba(255,255,255,":"rgba(145,116,72,")+alpha+")";
+    x.fillRect(rx,ry,1+seeded(i+50)*2.5,1+seeded(i+80)*1.5);
   }
-  var wash=x.createRadialGradient(W*.5,H*.42,0,W*.5,H*.42,Math.max(W,H)*.72);
-  wash.addColorStop(0,"rgba(255,255,255,.14)");
-  wash.addColorStop(.68,"rgba(191,157,103,.08)");
-  wash.addColorStop(1,"rgba(0,0,0,0)");
-  x.fillStyle=wash; x.fillRect(0,0,W,H);
+  var vign=x.createRadialGradient(W*.5,H*.42,0,W*.5,H*.42,Math.max(W,H)*.8);
+  vign.addColorStop(0,"rgba(255,255,255,.12)");
+  vign.addColorStop(.7,"rgba(196,166,106,.08)");
+  vign.addColorStop(1,"rgba(0,0,0,.04)");
+  x.fillStyle=vign; x.fillRect(0,0,W,H);
 
-  var gold="#b38840", goldDeep="#7b5a24", ink="#3e2d1f", line="#c6a15d";
+  var gold="#af8238", goldDeep="#6e4d1b", ink="#352618";
   var outer=W*.05, inner=W*.068;
   roundedRect(outer,outer,W-outer*2,H-outer*2,W*.02);
-  x.strokeStyle="rgba(182,136,64,.55)"; x.lineWidth=Math.max(2,W*.0026); x.stroke();
+  x.strokeStyle="rgba(175,130,56,.58)"; x.lineWidth=Math.max(2,W*.0026); x.stroke();
   roundedRect(inner,inner,W-inner*2,H-inner*2,W*.016);
-  x.strokeStyle="rgba(198,161,93,.72)"; x.lineWidth=Math.max(1.6,W*.0018); x.stroke();
-
+  x.strokeStyle="rgba(197,159,91,.72)"; x.lineWidth=Math.max(1.6,W*.0018); x.stroke();
   function corner(x0,y0,flipX,flipY){
-    x.save(); x.translate(x0,y0); x.scale(flipX,flipY); x.strokeStyle="rgba(182,136,64,.8)"; x.lineWidth=Math.max(1.6,W*.0016);
+    x.save(); x.translate(x0,y0); x.scale(flipX,flipY); x.strokeStyle="rgba(182,136,64,.82)"; x.lineWidth=Math.max(1.6,W*.0016);
     x.beginPath(); x.moveTo(0,28); x.quadraticCurveTo(0,0,28,0); x.moveTo(8,28); x.quadraticCurveTo(8,8,28,8); x.stroke();
     x.restore();
   }
@@ -929,35 +947,43 @@ function drawCard(){
 
   x.textAlign="center"; x.textBaseline="middle";
   x.fillStyle=gold;
-  x.font="600 "+Math.round(W*.023)+"px 'JetBrains Mono', monospace";
-  x.fillText("THE APPLIED WORD PODCAST",W/2,H*(shortCard?.08:.072));
-  drawMark(W/2,H*(shortCard?.16:.135),W*(shortCard?.10:.115));
+  x.font="700 "+Math.round(W*.021)+"px 'JetBrains Mono', monospace";
+  x.fillText("THE APPLIED WORD PODCAST",W/2,H*(shortCard?.068:.062));
+  var logoW=W*(shortCard?.26:.28), logoH=logoW;
+  var logoY=H*(shortCard?.15:.14);
+  if(cardLogo.complete && cardLogo.naturalWidth){
+    x.save();
+    x.shadowColor='rgba(0,0,0,.14)'; x.shadowBlur=W*.014; x.shadowOffsetY=W*.005;
+    x.drawImage(cardLogo, W/2-logoW/2, logoY-logoH/2, logoW, logoH);
+    x.restore();
+  }
 
-  var pad=W*.12, maxW=W-pad*2;
-  var size=Math.round(W*(shortCard?.050:.056));
-  var maxBlock=H*(shortCard?.42:.44), lines=wrappedLines(cv.text,maxW,size,"700","");
-  while(lines.length*size*1.34>maxBlock && size>Math.round(W*.03)){
-    size-=Math.max(2,Math.round(W*.0028));
+  var pad=W*.115, maxW=W-pad*2;
+  var size=Math.round(W*(shortCard?.061:.066));
+  var maxBlock=H*(shortCard?.38:.34), lines=wrappedLines(cv.text,maxW,size,"700","");
+  while(lines.length*size*1.26>maxBlock && size>Math.round(W*.036)){
+    size-=Math.max(2,Math.round(W*.0025));
     lines=wrappedLines(cv.text,maxW,size,"700","");
   }
-  var lineH=size*1.34, blockH=lines.length*lineH;
-  var verseCenter=H*(shortCard?.53:.55), startY=verseCenter-blockH/2+lineH*.48;
+  var lineH=size*1.26, blockH=lines.length*lineH;
+  var verseCenter=H*(shortCard?.55:.51);
+  var startY=verseCenter-blockH/2+lineH*.48;
   x.font="700 "+size+"px 'Roboto Slab', Georgia, serif";
   x.fillStyle=ink;
-  x.shadowColor="rgba(255,255,255,.35)"; x.shadowBlur=W*.005; x.shadowOffsetY=0;
+  x.shadowColor="rgba(255,255,255,.28)"; x.shadowBlur=W*.004; x.shadowOffsetY=0;
   for(var k=0;k<lines.length;k++) x.fillText(lines[k],W/2,startY+k*lineH);
   x.shadowColor="transparent"; x.shadowBlur=0;
 
-  var refY=Math.min(H*(shortCard?.80:.82), startY+blockH+W*.085);
+  var refY=Math.min(H*(shortCard?.79:.76), startY+blockH+W*.075);
   x.strokeStyle="rgba(182,136,64,.72)"; x.lineWidth=Math.max(2,W*.0021);
-  x.beginPath(); x.moveTo(W*.30,refY-W*.032); x.lineTo(W*.70,refY-W*.032); x.stroke();
+  x.beginPath(); x.moveTo(W*.29,refY-W*.036); x.lineTo(W*.71,refY-W*.036); x.stroke();
   x.fillStyle=goldDeep;
-  x.font="700 "+Math.round(W*.028)+"px 'JetBrains Mono', monospace";
+  x.font="700 "+Math.round(W*.03)+"px 'JetBrains Mono', monospace";
   x.fillText(cv.ref.toUpperCase(),W/2,refY);
 
-  x.fillStyle="rgba(123,90,36,.88)";
-  x.font="italic "+Math.round(W*.023)+"px 'Lora', Georgia, serif";
-  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.90:.92));
+  x.fillStyle="rgba(123,90,36,.9)";
+  x.font="italic "+Math.round(W*.024)+"px 'Lora', Georgia, serif";
+  x.fillText("Sharpening the man through the Message.",W/2,H*(shortCard?.895:.875));
 }
 
 function saveCard(){
@@ -995,12 +1021,15 @@ function openCardFor(b,c,v){
    SETTINGS
    ============================================================ */
 function settingsView(){
-  var tier=TIERS[0], m=state.meta.bsb;
+  var tier=TIERS[0], m=state.meta.bsb, active=getTheme().id;
   return '<div class="pad settings-page">'+
     '<button class="backlink" data-go="'+(anyInstalled()?'bible':'devotion')+'">&#8249; BACK</button>'+
     '<div class="eyebrow">App &amp; library</div>'+
     '<h1 style="font-size:34px">SETTINGS</h1><div class="rule" style="margin-bottom:12px"></div>'+
-    '<div class="grouphd" style="margin-top:6px">BIBLE LIBRARY</div>'+
+    '<div class="grouphd" style="margin-top:6px">APP THEME</div>'+
+    '<div class="theme-grid">'+THEMES.map(function(t){ return '<button class="theme-card'+(active===t.id?' on':'')+'" data-themeopt="'+t.id+'">'+
+      '<span class="theme-swatch '+t.id+'"></span><span><b>'+t.name+'</b><small>'+t.meta+'</small></span></button>'; }).join('')+'</div>'+
+    '<div class="grouphd" style="margin-top:28px">BIBLE LIBRARY</div>'+
     '<div class="tier">'+
       '<div class="tier-top"><div class="tier-label">BEREAN STANDARD BIBLE</div>'+
         '<div class="tier-badge'+(m?" in":"")+'">'+(m?"INSTALLED":"NOT DOWNLOADED")+'</div></div>'+
@@ -1078,6 +1107,7 @@ function screenHTML(){
 }
 
 function render(){
+  applyTheme();
   var scr=$("screen");
   var keepScroll=(state.tab==="bible" && state.bview==="read") ? scr.scrollTop : 0;
   scr.innerHTML=screenHTML();
@@ -1094,6 +1124,7 @@ function render(){
 
   wire(scr);
   if(state.tab==="card") drawCard();
+  if(state.tab==="devotion" && state.devMode==="today") startHeroCycle(); else stopHeroCycle();
 }
 
 function on(root, sel, fn){
@@ -1108,7 +1139,10 @@ function wire(scr){
     b.onclick=function(){ state.tab=b.dataset.go; render(); };
   });
   on(scr,"[data-dev]",function(b){
-    b.onclick=function(){ state.devMode=b.dataset.dev; render(); };
+    b.onclick=function(){ state.devMode=b.dataset.dev; if(state.devMode==="today" && (state.heroIndex<0 || state.heroIndex>=HERO_IMAGES.length)) state.heroIndex=baseHeroIndex(); render(); };
+  });
+  on(scr,"[data-themeopt]",function(b){
+    b.onclick=function(){ state.theme=b.dataset.themeopt; ls("theme", state.theme); applyTheme(); render(); };
   });
   on(scr,"[data-half]",function(b){
     b.onclick=function(){ state.spHalf=b.dataset.half; loadSpurgeon(); };
@@ -1522,6 +1556,7 @@ if(window.matchMedia){
 var settingsBtn=$("settingsBtn");
 if(settingsBtn) settingsBtn.onclick=function(){ state.tab="settings"; render(); };
 
+applyTheme();
 initSheet();
 initInstallPromotion();
 
