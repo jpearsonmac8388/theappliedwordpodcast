@@ -1174,3 +1174,64 @@ nav button span{font-size:6.7px;line-height:1}
 .selection-actions button{background:var(--surface);border-color:var(--line)!important}
 .category-panel,.install-panel{border-radius:18px;background:linear-gradient(180deg,var(--raise),var(--ground));border-color:var(--line-strong)}
 .empty{border-radius:var(--radius-card);border:1px solid var(--line);background:color-mix(in srgb,var(--ground) 68%,transparent);padding:20px 16px}
+
+/* v23 reminders, prayer focus feed, and notification controls */
+.podcast-alert-card{
+  margin:0 0 16px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  border:1px solid var(--line);border-radius:var(--radius-card);background:linear-gradient(150deg,var(--surface),var(--surface-2));
+  box-shadow:0 7px 20px rgba(0,0,0,.08)
+}
+.podcast-alert-card>div{min-width:0}.podcast-alert-card b{display:block;margin-top:5px;font-family:var(--slab);font-size:13px;color:var(--bone)}
+.podcast-alert-card small{display:block;margin-top:3px;font-family:var(--util);font-size:6.7px;letter-spacing:.05em;color:var(--ash)}
+.primary-btn.compact,.secondary-btn.compact{min-height:34px;padding:7px 10px;white-space:nowrap;font-size:7px}
+
+.reminder-strip{
+  width:100%;margin:8px 0 0;padding:10px 11px;display:grid;grid-template-columns:28px 1fr 18px;gap:9px;align-items:center;text-align:left;
+  border:1px solid var(--line);border-radius:var(--radius-control);background:color-mix(in srgb,var(--raise) 60%,transparent);color:var(--bone)
+}
+.reminder-strip>span:first-child{font-size:15px}.reminder-strip>span:last-child{text-align:right;color:var(--brass);font-size:18px}
+.reminder-strip b{display:block;font-family:var(--slab);font-size:11px;color:var(--bone)}
+.reminder-strip small{display:block;margin-top:2px;font-family:var(--util);font-size:6.5px;letter-spacing:.04em;color:var(--ash)}
+
+.reminder-overlay{
+  position:fixed;inset:0;z-index:120;display:flex;align-items:flex-end;justify-content:center;padding:14px 10px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(5,8,12,.68);backdrop-filter:blur(8px)
+}
+.reminder-panel{
+  width:min(460px,100%);max-height:84dvh;overflow:auto;padding:15px;border-radius:20px;border:1px solid var(--line-strong);
+  background:linear-gradient(180deg,var(--raise),var(--ground));box-shadow:0 28px 70px rgba(0,0,0,.48)
+}
+.reminder-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.reminder-head h2{margin-top:4px;font-family:var(--slab);font-size:18px;line-height:1.2;color:var(--bone)}
+.reminder-form{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.reminder-form label{display:flex;flex-direction:column;gap:5px;font-family:var(--util);font-size:6.5px;letter-spacing:.07em;color:var(--ash)}
+.reminder-form select,.reminder-form input{
+  width:100%;height:42px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--surface);color:var(--bone);font-family:var(--slab);font-size:16px!important
+}
+.reminder-panel[data-frequency="daily"] .rem-once,.reminder-panel[data-frequency="daily"] .rem-weekly,.reminder-panel[data-frequency="daily"] .rem-monthly{display:none}
+.reminder-panel[data-frequency="once"] .rem-weekly,.reminder-panel[data-frequency="once"] .rem-monthly{display:none}
+.reminder-panel[data-frequency="weekly"] .rem-once,.reminder-panel[data-frequency="weekly"] .rem-monthly{display:none}
+.reminder-panel[data-frequency="monthly"] .rem-once,.reminder-panel[data-frequency="monthly"] .rem-weekly{display:none}
+.notification-status-box{margin-top:12px;padding:10px 11px;display:grid;grid-template-columns:1fr auto auto;gap:9px;align-items:center;border:1px solid var(--line);border-radius:var(--radius-control);background:color-mix(in srgb,var(--forge) 20%,var(--ground))}
+.notification-status-box>span{font-family:var(--util);font-size:6.5px;letter-spacing:.07em;color:var(--ash)}
+.notification-status-box>b{font-family:var(--slab);font-size:10px;color:var(--bone)}
+.reminder-help{margin-top:10px;font-family:var(--slab);font-size:10.5px;line-height:1.45;color:var(--ash)}
+.reminder-actions{display:grid;grid-template-columns:auto 1fr;gap:8px;margin-top:13px}.reminder-actions .primary-btn{width:100%}.reminder-actions .primary-btn:only-child{grid-column:1/-1}
+
+.today-prayer-card{margin:10px 0 12px;padding:13px;border:1px solid var(--line);border-radius:var(--radius-card);background:linear-gradient(145deg,color-mix(in srgb,var(--brass) 8%,var(--surface)),var(--surface-2));box-shadow:0 7px 20px rgba(0,0,0,.08)}
+.today-prayer-card.empty-today p{margin-top:7px;font-family:var(--slab);font-size:11.5px;color:var(--ash)}
+.today-prayer-list{display:grid;gap:8px;margin-top:9px}.today-prayer-row{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;padding-top:8px;border-top:1px solid var(--line)}
+.today-prayer-row:first-child{padding-top:0;border-top:0}.today-prayer-row b{display:block;font-family:var(--slab);font-size:12px;line-height:1.35;color:var(--bone)}
+.today-prayer-row small{display:block;margin-top:3px;font-family:var(--util);font-size:6.3px;letter-spacing:.05em;color:var(--ash)}
+.prayer-cat-chip{display:inline-flex;align-items:center;min-height:24px;padding:4px 7px;border-radius:999px;background:color-mix(in srgb,var(--brass) 12%,transparent);border:1px solid color-mix(in srgb,var(--brass) 18%,transparent);font-family:var(--util);font-size:6px;font-weight:700;letter-spacing:.05em;color:var(--brass);white-space:nowrap}
+.prayer-card.pinned{border-color:color-mix(in srgb,var(--brass) 28%,transparent);box-shadow:0 8px 23px rgba(0,0,0,.10),inset 3px 0 0 color-mix(in srgb,var(--brass) 65%,transparent)}
+.prayer-meta-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:end;margin-bottom:8px}
+.prayer-meta-row label{display:flex;flex-direction:column;gap:4px;font-family:var(--util);font-size:6px;letter-spacing:.06em;color:var(--ash)}
+.prayer-meta-row select{width:100%;height:38px;padding:0 9px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--bone);font-family:var(--slab);font-size:16px!important}
+.prayer-reminder-chip{max-width:158px;padding:7px 8px;border-radius:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--forge) 20%,var(--ground));font-family:var(--util);font-size:6px;line-height:1.3;letter-spacing:.04em;color:var(--ash);text-align:right}
+
+@media (max-width:390px){
+  .reminder-form{grid-template-columns:1fr}.notification-status-box{grid-template-columns:1fr auto}.notification-status-box .secondary-btn{grid-column:1/-1;width:100%}
+  .prayer-meta-row{grid-template-columns:1fr}.prayer-reminder-chip{max-width:none;text-align:left}
+  .prayer-card-head>div{gap:3px}.prayer-card-head .icon-text-btn{font-size:5.8px;padding-left:6px;padding-right:6px}
+  .podcast-alert-card{align-items:flex-start;flex-direction:column}.podcast-alert-card button{width:100%}
+}

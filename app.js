@@ -163,9 +163,17 @@ var state = {
   noteSection: ls("noteSection") || "sermon",
   noteId: null,
   notePreview: false,
+  reminderTarget: null,
   returnTab: "devotion",
   categoryOpen: null
 };
+try{
+  var initialParams=new URLSearchParams(location.search);
+  var initialTab=initialParams.get("tab"), initialSection=initialParams.get("section"), initialNote=initialParams.get("note");
+  if(["devotion","podcast","bible","notes","history"].indexOf(initialTab)>-1) state.tab=initialTab;
+  if(["sermon","prayer","study","men"].indexOf(initialSection)>-1) state.noteSection=initialSection;
+  if(initialNote) state.noteId=initialNote;
+}catch(e){}
 
 /* ---------- user marks ---------- */
 function keyOf(b,c,v){ return b+":"+c+":"+v; }
@@ -197,13 +205,52 @@ var NOTE_SECTIONS=[
   {id:"study", label:"BIBLE STUDY NOTES", short:"STUDY", hint:"Record observations, cross references, and study thoughts.", kind:"document"},
   {id:"men", label:"MEN’S GROUP NOTES", short:"MEN’S GROUP", hint:"Track discussion points, accountability, and next steps.", kind:"document"}
 ];
+var PRAYER_CATEGORIES=["Family","Personal","Health","Salvation","Guidance","Provision","Relationships","Church","World & Missions","Thanksgiving","Other"];
+var REMINDER_FREQS=[
+  {id:"once",label:"One time"},
+  {id:"daily",label:"Daily"},
+  {id:"weekly",label:"Weekly"},
+  {id:"monthly",label:"Monthly"}
+];
+function notificationPrefs(){
+  var p=jget("notificationPrefs",{});
+  if(typeof p.podcast!=="boolean") p.podcast=false;
+  if(typeof p.lastPodcastKey!=="string") p.lastPodcastKey="";
+  return p;
+}
+function saveNotificationPrefs(p){ jset("notificationPrefs",p||{}); }
+function cleanReminder(r){
+  if(!r || typeof r!=="object") return null;
+  var out={
+    enabled:r.enabled!==false,
+    frequency:["once","daily","weekly","monthly"].indexOf(r.frequency)>-1?r.frequency:"once",
+    date:r.date||stampOf(new Date()),
+    time:r.time||"07:00",
+    weekday:Number.isFinite(+r.weekday)?+r.weekday:new Date().getDay(),
+    monthday:Number.isFinite(+r.monthday)?Math.max(1,Math.min(31,+r.monthday)):new Date().getDate(),
+    lastFired:r.lastFired||""
+  };
+  return out;
+}
+function defaultReminder(){
+  var d=new Date(Date.now()+3600000);
+  return {enabled:true,frequency:"once",date:stampOf(d),time:pad(d.getHours())+":"+pad(d.getMinutes()),weekday:d.getDay(),monthday:d.getDate(),lastFired:""};
+}
 function noteSectionById(id){ return NOTE_SECTIONS.find(function(s){return s.id===id;}) || NOTE_SECTIONS[0]; }
 function makeId(prefix){ return prefix+"-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
 function normalizeNoteLibrary(lib){
   lib=lib&&typeof lib==="object"?lib:{};
   if(!lib.docs) lib.docs={};
-  ["sermon","study","men"].forEach(function(k){ if(!Array.isArray(lib.docs[k])) lib.docs[k]=[]; });
+  ["sermon","study","men"].forEach(function(k){
+    if(!Array.isArray(lib.docs[k])) lib.docs[k]=[];
+    lib.docs[k].forEach(function(n){ if(n.reminder) n.reminder=cleanReminder(n.reminder); });
+  });
   if(!Array.isArray(lib.prayers)) lib.prayers=[];
+  lib.prayers.forEach(function(r){
+    if(!r.category || PRAYER_CATEGORIES.indexOf(r.category)<0) r.category="Personal";
+    r.pinned=!!r.pinned;
+    if(r.reminder) r.reminder=cleanReminder(r.reminder);
+  });
   return lib;
 }
 function noteLibrary(){
@@ -236,9 +283,15 @@ function saveDoc(section,id,title,body){
 function deleteDoc(section,id){
   var lib=noteLibrary(); lib.docs[section]=(lib.docs[section]||[]).filter(function(n){return n.id!==id;}); saveNoteLibrary(lib);
 }
-function prayerRequests(){ return noteLibrary().prayers.slice().sort(function(a,b){return (b.created||0)-(a.created||0);}); }
+function prayerRequests(){
+  return noteLibrary().prayers.slice().sort(function(a,b){
+    if(!!a.answered!==!!b.answered) return a.answered?1:-1;
+    if(!!a.pinned!==!!b.pinned) return a.pinned?-1:1;
+    return (b.updated||b.created||0)-(a.updated||a.created||0);
+  });
+}
 function createPrayer(){
-  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:"",answered:false,created:now,updated:now};
+  var lib=noteLibrary(), now=Date.now(), item={id:makeId("prayer"),text:"",answered:false,category:"Personal",pinned:false,reminder:null,created:now,updated:now};
   lib.prayers.unshift(item); saveNoteLibrary(lib); return item;
 }
 function savePrayer(id,textVal){
@@ -250,6 +303,178 @@ function togglePrayer(id){
   item.answered=!item.answered; item.updated=Date.now(); saveNoteLibrary(lib);
 }
 function deletePrayer(id){ var lib=noteLibrary(); lib.prayers=lib.prayers.filter(function(x){return x.id!==id;}); saveNoteLibrary(lib); }
+function setPrayerCategory(id,category){
+  var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(!item) return;
+  item.category=PRAYER_CATEGORIES.indexOf(category)>-1?category:"Other"; item.updated=Date.now(); saveNoteLibrary(lib);
+}
+function togglePrayerPin(id){
+  var lib=noteLibrary(), item=lib.prayers.find(function(x){return x.id===id;}); if(!item) return false;
+  item.pinned=!item.pinned; item.updated=Date.now(); saveNoteLibrary(lib); return item.pinned;
+}
+function findPrayer(id){ return noteLibrary().prayers.find(function(x){return x.id===id;}) || null; }
+function setItemReminder(target,reminder){
+  var lib=noteLibrary();
+  if(!target) return;
+  if(target.type==="prayer"){
+    var pr=lib.prayers.find(function(x){return x.id===target.id;}); if(!pr) return;
+    pr.reminder=reminder?cleanReminder(reminder):null; pr.updated=Date.now();
+  } else if(target.type==="note"){
+    var list=lib.docs[target.section]||[], doc=list.find(function(x){return x.id===target.id;}); if(!doc) return;
+    doc.reminder=reminder?cleanReminder(reminder):null; doc.updated=Date.now();
+  }
+  saveNoteLibrary(lib);
+}
+function reminderForTarget(target){
+  if(!target) return null;
+  if(target.type==="prayer"){ var p=findPrayer(target.id); return p&&p.reminder?cleanReminder(p.reminder):null; }
+  var d=findDoc(target.section,target.id); return d&&d.reminder?cleanReminder(d.reminder):null;
+}
+function reminderSummary(r){
+  r=cleanReminder(r); if(!r) return "No reminder";
+  var time=r.time||"07:00", parts=time.split(":"), h=+parts[0], m=parts[1]||"00", ampm=h>=12?"PM":"AM", hh=h%12||12;
+  var clock=hh+":"+m+" "+ampm;
+  if(r.frequency==="daily") return "Daily · "+clock;
+  if(r.frequency==="weekly") return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][r.weekday]+" · "+clock;
+  if(r.frequency==="monthly") return "Monthly · day "+r.monthday+" · "+clock;
+  var d=r.date?new Date(r.date+"T12:00:00"):new Date();
+  return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" · "+clock;
+}
+
+function timeMinutes(t){ var p=String(t||"00:00").split(":"), h=+p[0]||0,m=+p[1]||0; return h*60+m; }
+function dateKeyLocal(d){ return stampOf(d); }
+function reminderOccursToday(r,d){
+  r=cleanReminder(r); if(!r||r.enabled===false) return false;
+  if(r.frequency==="daily") return true;
+  if(r.frequency==="weekly") return d.getDay()===r.weekday;
+  if(r.frequency==="monthly") return d.getDate()===r.monthday;
+  return r.date===dateKeyLocal(d);
+}
+function reminderDueKey(r,now){
+  r=cleanReminder(r); if(!r||r.enabled===false) return null;
+  if(r.frequency==="once"){
+    var due=new Date(r.date+"T"+(r.time||"07:00")+":00");
+    var onceKey="once:"+r.date+":"+r.time;
+    return now>=due && r.lastFired!==onceKey ? onceKey : null;
+  }
+  if(!reminderOccursToday(r,now)) return null;
+  var minutes=now.getHours()*60+now.getMinutes();
+  if(minutes<timeMinutes(r.time)) return null;
+  var key=r.frequency+":"+dateKeyLocal(now);
+  return r.lastFired===key?null:key;
+}
+function prayersForToday(){
+  var now=new Date();
+  return prayerRequests().filter(function(r){
+    return !r.answered && (r.pinned || (r.reminder && reminderOccursToday(r.reminder,now)));
+  });
+}
+function updateReminderLastFired(target,key){
+  var lib=noteLibrary();
+  if(target.type==="prayer"){
+    var pr=lib.prayers.find(function(x){return x.id===target.id;});
+    if(pr&&pr.reminder) pr.reminder.lastFired=key;
+  }else{
+    var list=lib.docs[target.section]||[], doc=list.find(function(x){return x.id===target.id;});
+    if(doc&&doc.reminder) doc.reminder.lastFired=key;
+  }
+  saveNoteLibrary(lib);
+}
+function canNotify(){ return typeof Notification!=="undefined"; }
+function notificationStatus(){
+  if(!canNotify()) return "unsupported";
+  return Notification.permission || "default";
+}
+function ensureNotificationPermission(){
+  if(!canNotify()) return Promise.resolve("unsupported");
+  if(Notification.permission!=="default") return Promise.resolve(Notification.permission);
+  return Notification.requestPermission();
+}
+function showAppNotification(title,body,data){
+  if(!canNotify() || Notification.permission!=="granted") return Promise.resolve(false);
+  var opts={body:body||"",icon:"icons/icon-192.png",badge:"icons/favicon.png",tag:(data&&data.tag)||("taw-"+Date.now()),data:data||{}};
+  if("serviceWorker" in navigator){
+    return navigator.serviceWorker.ready.then(function(reg){ return reg.showNotification(title,opts).then(function(){return true;}); }).catch(function(){return false;});
+  }
+  try{ new Notification(title,opts); return Promise.resolve(true); }catch(e){ return Promise.resolve(false); }
+}
+function fireReminderTarget(target,item,key){
+  var title,body,url;
+  if(target.type==="prayer"){
+    title="Prayer reminder";
+    body=(item.category?item.category+": ":"")+snip(item.text||"Prayer request",120);
+    url="./?tab=notes&section=prayer";
+  }else{
+    title="Note reminder";
+    body=(item.title||"Untitled note")+" · "+noteSectionById(target.section).label;
+    url="./?tab=notes&section="+encodeURIComponent(target.section)+"&note="+encodeURIComponent(target.id);
+  }
+  return showAppNotification(title,body,{tag:"reminder-"+target.id,url:url,type:"reminder"}).then(function(shown){
+    if(!shown) toast(title+": "+body);
+    updateReminderLastFired(target,key);
+    return shown;
+  });
+}
+function checkLocalReminders(){
+  var now=new Date(), lib=noteLibrary();
+  ["sermon","study","men"].forEach(function(section){
+    (lib.docs[section]||[]).forEach(function(doc){
+      if(!doc.reminder) return;
+      var key=reminderDueKey(doc.reminder,now);
+      if(key) fireReminderTarget({type:"note",section:section,id:doc.id},doc,key);
+    });
+  });
+  (lib.prayers||[]).forEach(function(pr){
+    if(pr.answered||!pr.reminder) return;
+    var key=reminderDueKey(pr.reminder,now);
+    if(key) fireReminderTarget({type:"prayer",id:pr.id},pr,key);
+  });
+  checkPodcastReleaseReminder(now);
+}
+function pacificParts(d){
+  try{
+    var f=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",weekday:"short",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+    var parts=f.formatToParts(d), out={}; parts.forEach(function(p){out[p.type]=p.value;}); return out;
+  }catch(e){ return null; }
+}
+function podcastReleaseKey(now){
+  var p=pacificParts(now); if(!p) return null;
+  var days={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}, dow=days[p.weekday];
+  if(dow===undefined) return null;
+  var mins=(+p.hour)*60+(+p.minute);
+  if(dow===1 && mins<360) return null;
+  var back=(dow+6)%7;
+  var d=new Date(Date.UTC(+p.year,+p.month-1,+p.day));
+  d.setUTCDate(d.getUTCDate()-back);
+  return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());
+}
+function checkPodcastReleaseReminder(now){
+  var prefs=notificationPrefs(); if(!prefs.podcast) return;
+  var key=podcastReleaseKey(now||new Date());
+  if(!key||prefs.lastPodcastKey===key) return;
+  prefs.lastPodcastKey=key; saveNotificationPrefs(prefs);
+  showAppNotification("New episode day","The Applied Word Podcast releases Mondays at 6:00 AM Pacific. Open Spotify to listen.",{tag:"podcast-"+key,url:SHOW_URL,type:"podcast"}).then(function(shown){
+    if(!shown) toast("New episode day · Open the Podcast tab to listen");
+  });
+}
+
+function updateReminderFormVisibility(){
+  var f=$("reminderFreq"), panel=document.querySelector(".reminder-panel"); if(!f||!panel) return;
+  panel.setAttribute("data-frequency",f.value);
+}
+function saveReminderFromPanel(){
+  var target=state.reminderTarget; if(!target) return;
+  var freq=$("reminderFreq"), time=$("reminderTime"), date=$("reminderDate"), weekday=$("reminderWeekday"), monthday=$("reminderMonthday");
+  var r=reminderForTarget(target)||defaultReminder();
+  r.frequency=freq?freq.value:"once";
+  r.time=time&&time.value?time.value:"07:00";
+  r.date=date&&date.value?date.value:stampOf(new Date());
+  r.weekday=weekday?+weekday.value:new Date().getDay();
+  r.monthday=monthday?Math.max(1,Math.min(31,+monthday.value||1)):new Date().getDate();
+  r.enabled=true; r.lastFired="";
+  setItemReminder(target,r);
+  state.reminderTarget=null;
+  ensureNotificationPermission().then(function(){ toast("Reminder saved"); render(); checkLocalReminders(); });
+}
 function noteStats(){
   var lib=noteLibrary(), docs=0, chars=0;
   ["sermon","study","men"].forEach(function(k){ docs+=(lib.docs[k]||[]).length; (lib.docs[k]||[]).forEach(function(n){chars+=(n.title||"").length+(n.body||"").length;}); });
@@ -753,6 +978,7 @@ function parseSpurgeon(html){
    PODCAST
    ============================================================ */
 function podcastView(){
+  var prefs=notificationPrefs();
   return '<div class="pad podcast-page">'+
     screenHead("Podcast","Listen to the latest weekly devotional")+
     '<div class="podcast-showcase">'+
@@ -766,8 +992,9 @@ function podcastView(){
     '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" '+
       'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
     '<a class="cta spotify-link" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
+    '<div class="podcast-alert-card"><div><span class="content-kicker">NEW EPISODE ALERTS</span><b>Monday · 6:00 AM Pacific</b><small>'+(prefs.podcast?'Release reminder enabled':'Release reminder off')+'</small></div><button class="'+(prefs.podcast?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+(prefs.podcast?'TURN OFF':'ENABLE')+'</button></div>'+
     '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div>'+
-      '<p class="muted">If the embedded player is blocked by the browser, open the show in Spotify with the button above.</p></div>'+
+      '<p class="muted">The Spotify player above displays the show and its newest episodes. The release alert uses the Monday 6:00 AM Pacific schedule.</p></div>'+
     '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
@@ -1103,7 +1330,7 @@ function noteListView(sec){
     return '<button class="note-list-card" data-noteopen="'+n.id+'">'+
       '<span class="note-list-top"><b>'+esc(title)+'</b><small>'+esc(d)+'</small></span>'+
       '<span class="note-list-preview">'+esc(preview)+'</span>'+
-      '<span class="note-list-meta">'+(n.body||'').length.toLocaleString()+' CHARACTERS</span></button>';
+      '<span class="note-list-meta">'+(n.body||'').length.toLocaleString()+' CHARACTERS'+(n.reminder?' · 🔔 '+esc(reminderSummary(n.reminder)):'')+'</span></button>';
   }).join(''):emptyBox('NO NOTES YET','Create a note and it will appear here with its title and a preview.');
   return '<div class="pad notes-page">'+screenHead('Notes','Saved, titled notes with Markdown support')+
     notesTabsHTML()+
@@ -1117,6 +1344,7 @@ function noteEditorView(sec,doc){
   return '<div class="pad notes-page note-editor-page">'+
     '<div class="nested-topbar"><button class="backlink compact-back" data-noteback="1">‹ NOTES</button><span>LAST SAVED '+esc(updated.toUpperCase())+'</span></div>'+
     '<input id="noteTitle" class="note-title-input" type="text" placeholder="Note title" value="'+esc(doc.title||'')+'" autocomplete="off">'+
+    '<button class="reminder-strip" data-reminderdoc="'+doc.id+'"><span>🔔</span><span><b>Reminder</b><small>'+esc(doc.reminder?reminderSummary(doc.reminder):'Not set')+'</small></span><span>›</span></button>'+
     '<div class="notes-toolbar compact-toolbar" role="toolbar" aria-label="Markdown formatting">'+
       '<button type="button" data-md="bold" aria-label="Bold" title="Bold"><b>B</b></button>'+
       '<button type="button" data-md="italic" aria-label="Italic" title="Italic"><i>I</i></button>'+
@@ -1130,26 +1358,64 @@ function noteEditorView(sec,doc){
     '<div class="note-editor-actions"><button class="secondary-btn" data-notepreview="1">'+noteButtonLabel()+'</button><button class="secondary-btn danger" data-notedelete="'+doc.id+'">DELETE</button><button class="primary-btn" data-notesave="1">SAVE NOTE</button></div>'+
     '<div class="notes-meta">MARKDOWN SUPPORTED · AUTOSAVED ON THIS DEVICE</div></div>';
 }
+function prayerTodayFeed(){
+  var today=prayersForToday();
+  if(!today.length) return '<div class="today-prayer-card empty-today"><div class="content-kicker">TODAY’S PRAYER</div><p>No scheduled or pinned prayer requests for today.</p></div>';
+  return '<div class="today-prayer-card"><div class="content-kicker">TODAY’S PRAYER</div><div class="today-prayer-list">'+today.map(function(r){
+    return '<div class="today-prayer-row"><span class="prayer-cat-chip">'+esc(r.category||'Personal')+'</span><div><b>'+esc(snip(r.text||'Prayer request',105))+'</b><small>'+(r.pinned?'PINNED · ':'')+(r.reminder?esc(reminderSummary(r.reminder)):'ONGOING')+'</small></div></div>';
+  }).join('')+'</div></div>';
+}
 function prayerNotesView(sec){
   var prayers=prayerRequests();
   var rows=prayers.length?prayers.map(function(r){
     var d=new Date(r.updated||r.created||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    return '<div class="prayer-card'+(r.answered?' answered':'')+'">'+
-      '<div class="prayer-card-head"><span>'+esc(d)+'</span><div><button class="icon-text-btn" data-prayertoggle="'+r.id+'">'+(r.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button><button class="icon-only-btn danger" data-prayerdelete="'+r.id+'" aria-label="Delete prayer request">×</button></div></div>'+
-      '<textarea class="prayer-text" data-prayertext="'+r.id+'" placeholder="Prayer request…">'+esc(r.text||'')+'</textarea>'+
+    return '<div class="prayer-card'+(r.answered?' answered':'')+(r.pinned?' pinned':'')+'">'+
+      '<div class="prayer-card-head"><span>'+(r.pinned?'📌 PINNED · ':'')+esc(d)+'</span><div>'+ 
+        '<button class="icon-only-btn" data-prayerpin="'+r.id+'" aria-label="'+(r.pinned?'Unpin':'Pin')+' prayer request" title="'+(r.pinned?'Unpin':'Pin')+'">'+(r.pinned?'★':'☆')+'</button>'+ 
+        '<button class="icon-only-btn" data-reminderprayer="'+r.id+'" aria-label="Set reminder" title="Reminder">🔔</button>'+ 
+        '<button class="icon-text-btn" data-prayertoggle="'+r.id+'">'+(r.answered?'MARK ACTIVE':'MARK ANSWERED')+'</button>'+ 
+        '<button class="icon-only-btn danger" data-prayerdelete="'+r.id+'" aria-label="Delete prayer request">×</button></div></div>'+ 
+      '<div class="prayer-meta-row"><label>CATEGORY<select data-prayercategory="'+r.id+'">'+PRAYER_CATEGORIES.map(function(c){return '<option value="'+esc(c)+'"'+(r.category===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></label>'+ 
+        '<span class="prayer-reminder-chip">'+(r.reminder?'🔔 '+esc(reminderSummary(r.reminder)):'NO REMINDER')+'</span></div>'+ 
+      '<textarea class="prayer-text" data-prayertext="'+r.id+'" placeholder="What do you want to pray for?">'+esc(r.text||'')+'</textarea>'+ 
       (r.answered?'<div class="prayer-status">✓ ANSWERED</div>':'')+'</div>';
-  }).join(''):emptyBox('NO PRAYER REQUESTS YET','Add a request below. Each request can be as long as you need.');
-  return '<div class="pad notes-page prayer-page">'+screenHead('Notes','Prayer requests in a simple running list')+
+  }).join(''):emptyBox('NO PRAYER REQUESTS YET','Add a request. Each request can be as long as you need, categorized, pinned, and given a recurring reminder.');
+  return '<div class="pad notes-page prayer-page">'+screenHead('Prayer Requests','What do you want to pray for?')+
     notesTabsHTML()+
-    '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>'+sec.hint+'</p></div><button class="primary-mini" data-prayernew="1">+ ADD REQUEST</button></div>'+
-    '<div class="prayer-list">'+rows+'</div>'+
-    '<div class="foot">NO CHARACTER LIMIT · SAVED LOCALLY · INCLUDED IN BACKUPS</div></div>';
+    '<div class="notes-section-head"><div><div class="content-kicker">'+sec.label+'</div><p>Organize requests, set recurring reminders, and keep today’s prayer focus in one place.</p></div><button class="primary-mini" data-prayernew="1">+ ADD REQUEST</button></div>'+ 
+    prayerTodayFeed()+
+    '<div class="prayer-list">'+rows+'</div>'+ 
+    '<div class="foot">NO CHARACTER LIMIT · REMINDERS · CATEGORIES · INCLUDED IN BACKUPS</div></div>';
+}
+function reminderOverlayView(){
+  var target=state.reminderTarget; if(!target) return '';
+  var r=reminderForTarget(target)||defaultReminder();
+  var label='Reminder';
+  if(target.type==='prayer'){
+    var pr=findPrayer(target.id); label=pr&&pr.text?snip(pr.text,60):'Prayer request';
+  }else{
+    var doc=findDoc(target.section,target.id); label=doc&&doc.title?doc.title:'Untitled note';
+  }
+  return '<div class="reminder-overlay" data-reminderoverlay="1"><section class="reminder-panel" role="dialog" aria-modal="true" aria-label="Reminder settings">'+
+    '<div class="reminder-head"><div><div class="content-kicker">REMINDER</div><h2>'+esc(label)+'</h2></div><button class="icon-only-btn" data-reminderclose="1">×</button></div>'+ 
+    '<div class="reminder-form">'+
+      '<label>REPEAT<select id="reminderFreq">'+REMINDER_FREQS.map(function(f){return '<option value="'+f.id+'"'+(r.frequency===f.id?' selected':'')+'>'+f.label+'</option>';}).join('')+'</select></label>'+ 
+      '<label>TIME<input id="reminderTime" type="time" value="'+esc(r.time)+'"></label>'+ 
+      '<label class="rem-once">DATE<input id="reminderDate" type="date" value="'+esc(r.date)+'"></label>'+ 
+      '<label class="rem-weekly">DAY<select id="reminderWeekday">'+["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map(function(n,i){return '<option value="'+i+'"'+(r.weekday===i?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+ 
+      '<label class="rem-monthly">DAY OF MONTH<input id="reminderMonthday" type="number" min="1" max="31" value="'+r.monthday+'"></label>'+ 
+    '</div>'+ 
+    '<div class="notification-status-box"><span>NOTIFICATIONS</span><b>'+esc(notificationStatus()==='granted'?'Enabled':notificationStatus()==='denied'?'Blocked':notificationStatus()==='unsupported'?'Not supported':'Permission needed')+'</b><button class="secondary-btn compact" data-notifyenable="1">ENABLE</button></div>'+ 
+    '<p class="reminder-help">Reminders are checked while the app is running and again whenever it opens. Background push while the app is fully closed requires a web-push service.</p>'+ 
+    '<div class="reminder-actions">'+(reminderForTarget(target)?'<button class="secondary-btn danger" data-reminderremove="1">REMOVE</button>':'')+'<button class="primary-btn" data-remindersave="1">SAVE REMINDER</button></div>'+ 
+  '</section></div>';
 }
 function notesView(){
-  var sec=noteSectionById(state.noteSection);
-  if(sec.kind==='prayer') return prayerNotesView(sec);
-  if(state.noteId) return noteEditorView(sec,findDoc(sec.id,state.noteId));
-  return noteListView(sec);
+  var sec=noteSectionById(state.noteSection), html;
+  if(sec.kind==='prayer') html=prayerNotesView(sec);
+  else if(state.noteId) html=noteEditorView(sec,findDoc(sec.id,state.noteId));
+  else html=noteListView(sec);
+  return html+reminderOverlayView();
 }
 
 function emptyBox(h,p){
@@ -1377,6 +1643,7 @@ function settingsView(){
   var nstats=noteStats();
   var catCount=categories().length;
   var vbCount=verseBookmarks().length;
+  var nprefs=notificationPrefs();
   var bibleCards=TIERS.filter(function(t){return t.available;}).map(function(t){
     var m=state.meta[t.id], current=state.version===t.id;
     return '<div class="tier modern-tier">'+
@@ -1399,10 +1666,14 @@ function settingsView(){
       '<span class="theme-swatch '+t.id+'"></span><span><b>'+t.name+'</b><small>'+t.meta+'</small></span></button>'; }).join('')+'</div>'+
     '<div class="grouphd settings-section-head">BIBLE LIBRARY</div>'+bibleCards+
     '<div class="settings-legal">ASV and YLT are public domain. The KJV is public domain in the United States; special Crown rights can apply to publication in the United Kingdom.</div>'+
+    '<div class="grouphd settings-section-head">NOTIFICATIONS</div>'+
+    '<div class="setrow"><div><div class="lbl">App notifications</div><div class="sub">'+(notificationStatus()==="granted"?"Enabled":notificationStatus()==="denied"?"Blocked in browser settings":notificationStatus()==="unsupported"?"Not supported on this browser":"Permission not granted")+'</div></div><button class="mini" data-notifyenable="1">ENABLE</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Podcast release reminder</div><div class="sub">Monday at 6:00 AM Pacific · '+(nprefs.podcast?"enabled":"off")+'</div></div><button class="mini" data-podcastnotify="1">'+(nprefs.podcast?"TURN OFF":"TURN ON")+'</button></div>'+
+    '<div class="settings-legal">Local reminders are checked while the app is running and whenever it opens. True push while the app is fully closed requires a separate web-push service.</div>'+
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
     '<div class="setrow"><div><div class="lbl">Highlights &amp; saved Scripture</div><div class="sub">'+Object.keys(marks()).length+' marked verses · '+bookmarks().length+' chapter bookmarks · '+vbCount+' verse bookmarks · '+catCount+' categories</div></div><button class="mini" data-go="bible">OPEN</button></div>'+
     '<div class="setrow"><div><div class="lbl">Notes library</div><div class="sub">'+nstats.docs+' saved notes · '+nstats.prayers+' prayer requests · '+nstats.chars.toLocaleString()+' characters</div></div><button class="mini" data-go="notes">OPEN</button></div>'+
-    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, categories, bookmarks, highlights, reading-plan progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
+    '<div class="setrow"><div><div class="lbl">Backup app data</div><div class="sub">Exports notes, reminders, prayer categories, categories, bookmarks, highlights, reading-plan progress, activity, and preferences.</div></div><button class="mini" data-export="1">EXPORT</button></div>'+
     '<div class="setrow"><div><div class="lbl">Activity history</div><div class="sub">'+activity().length+' recent actions saved on this device.</div></div><button class="mini" data-clearhistory="1">CLEAR</button></div>'+
     '<div class="setrow"><div><div class="lbl">Reset app data</div><div class="sub">Removes local notes, categories, marks, bookmarks, activity, streaks, and downloaded Bible copies.</div></div><button class="mini danger" data-wipe="1">RESET</button></div>'+
     '<div class="foot">BIBLE TEXT DOWNLOADS AND YOUR READING DATA STAY ON THIS DEVICE</div></div>';
@@ -1450,6 +1721,7 @@ var TABS=[
 ];
 
 function backAvailable(){
+  if(state.reminderTarget) return true;
   if(state.tab==="settings" || state.tab==="card") return true;
   if(state.tab==="devotion" && state.devMode==="plan") return true;
   if(state.tab==="bible" && (state.bview!=="read" || state.categoryOpen)) return true;
@@ -1457,6 +1729,7 @@ function backAvailable(){
   return false;
 }
 function appBack(){
+  if(state.reminderTarget){ state.reminderTarget=null; render(); return; }
   if(state.tab==="notes" && state.noteId){ saveOpenNote(); state.noteId=null; state.notePreview=false; render(); return; }
   if(state.tab==="bible" && state.categoryOpen){ state.categoryOpen=null; state.bview="categories"; render(); return; }
   if(state.tab==="bible" && state.bview!=="read"){ state.bview="read"; state.sel=null; render(); return; }
@@ -1662,6 +1935,37 @@ function wire(scr){
   on(scr,"[data-prayerdelete]",function(b){
     b.onclick=function(){ if(b.dataset.armed){ deletePrayer(b.dataset.prayerdelete); render(); } else { b.dataset.armed="1"; b.textContent="?"; } };
   });
+  on(scr,"[data-prayercategory]",function(s){
+    s.onchange=function(){ setPrayerCategory(s.dataset.prayercategory,s.value); render(); };
+  });
+  on(scr,"[data-prayerpin]",function(b){
+    b.onclick=function(){ togglePrayerPin(b.dataset.prayerpin); render(); };
+  });
+  on(scr,"[data-reminderdoc]",function(b){
+    b.onclick=function(){ saveOpenNote(); state.reminderTarget={type:"note",section:state.noteSection,id:b.dataset.reminderdoc}; render(); };
+  });
+  on(scr,"[data-reminderprayer]",function(b){
+    b.onclick=function(){ state.reminderTarget={type:"prayer",id:b.dataset.reminderprayer}; render(); };
+  });
+  on(scr,"[data-reminderclose]",function(b){ b.onclick=function(){ state.reminderTarget=null; render(); }; });
+  on(scr,"[data-reminderoverlay]",function(o){ o.onclick=function(e){ if(e.target===o){ state.reminderTarget=null; render(); } }; });
+  on(scr,"[data-remindersave]",function(b){ b.onclick=saveReminderFromPanel; });
+  on(scr,"[data-reminderremove]",function(b){ b.onclick=function(){ setItemReminder(state.reminderTarget,null); state.reminderTarget=null; toast("Reminder removed"); render(); }; });
+  on(scr,"[data-notifyenable]",function(b){
+    b.onclick=function(){ ensureNotificationPermission().then(function(status){ toast(status==="granted"?"Notifications enabled":status==="denied"?"Notifications are blocked":"Notifications unavailable"); render(); }); };
+  });
+  var reminderFreq=$("reminderFreq");
+  if(reminderFreq){ reminderFreq.onchange=updateReminderFormVisibility; updateReminderFormVisibility(); }
+  on(scr,"[data-podcastnotify]",function(b){
+    b.onclick=function(){
+      var prefs=notificationPrefs();
+      if(prefs.podcast){ prefs.podcast=false; saveNotificationPrefs(prefs); toast("Podcast release reminder off"); render(); return; }
+      ensureNotificationPermission().then(function(status){
+        prefs=notificationPrefs(); prefs.podcast=true; saveNotificationPrefs(prefs);
+        toast(status==="granted"?"Podcast release reminder enabled":"Release reminder enabled in the app"); render(); checkLocalReminders();
+      });
+    };
+  });
   on(scr,"[data-clearhistory]",function(b){
     b.onclick=function(){
       jset("activity",[]);
@@ -1758,7 +2062,7 @@ function wire(scr){
   });
   on(scr,"[data-export]",function(b){
     b.onclick=function(){
-      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), noteLibrary:noteLibrary(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
+      var data={ marks:marks(), bookmarks:bookmarks(), verseBookmarks:verseBookmarks(), categories:categories(), noteLibrary:noteLibrary(), notificationPrefs:notificationPrefs(), plandone:planDone(), activity:activity(), theme:state.theme, version:state.version, fontScale:state.fontScale, exported:new Date().toISOString() };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
@@ -1771,7 +2075,7 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{});
+        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:""});
         ls("streak","0"); ls("lastWalk","");
         Promise.all(TIERS.filter(function(t){return t.available;})
           .map(function(t){ return removeTier(t.id); }))
@@ -2072,6 +2376,11 @@ refreshMeta()
   .then(function(){ render(); });
 
 render();
+
+setTimeout(checkLocalReminders,1800);
+setInterval(checkLocalReminders,60000);
+window.addEventListener("focus",checkLocalReminders);
+document.addEventListener("visibilitychange",function(){ if(!document.hidden) checkLocalReminders(); });
 
 /* ---------- offline shell ---------- */
 if ("serviceWorker" in navigator) {

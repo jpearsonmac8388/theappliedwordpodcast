@@ -138,3 +138,17 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 - Stabilized the mobile viewport and increased all editable control font sizes to prevent iOS focus zoom and off-center layout shifts.
 - Unified cards, buttons, controls, spacing, and interactive states around the active theme.
 - The new structured notes library is included in app backup exports.
+
+## v23 — reminders, prayer focus, and notifications
+
+- Notes and prayer requests can now have one-time, daily, weekly, or monthly reminders.
+- Prayer requests support categories, pinning, answered/active state, and a Today’s Prayer feed.
+- Prayer categories: Family, Personal, Health, Salvation, Guidance, Provision, Relationships, Church, World & Missions, Thanksgiving, and Other.
+- Notification permission can be enabled in Settings or from a reminder.
+- The app checks reminders while it is running, on focus/visibility changes, and when it opens.
+- Podcast release alerts can be enabled for Monday at 6:00 AM Pacific.
+- Reminder metadata, prayer categories/pins, and notification preferences are included in the JSON app backup.
+
+### Web notification limitation
+
+This remains a static PWA. Browser notification permission lets the app show OS notifications while it is active, and the service worker can display notifications when invoked. Reliable push delivery while the app is fully closed requires a web-push sender/backend (or another push service) to send Push API messages to subscribed devices. The Monday podcast alert in this static build therefore uses the known release schedule and is checked by the app rather than polling Spotify in the background.

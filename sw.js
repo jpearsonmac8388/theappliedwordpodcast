@@ -1,5 +1,5 @@
 /* The Applied Word Podcast — app shell cache */
-var CACHE = "applied-word-v22";
+var CACHE = "applied-word-v23";
 var SHELL = [
   "./", "./index.html", "./styles.css", "./content.js", "./mcheyne.js",
   "./bible.js", "./app.js", "./manifest.webmanifest",
@@ -40,4 +40,18 @@ self.addEventListener("fetch", function (e) {
       return res;
     }).catch(function () { return caches.match(e.request); })
   );
+});
+
+
+self.addEventListener("notificationclick", function (e) {
+  e.notification.close();
+  var data=e.notification.data||{}, target=data.url||"./";
+  e.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then(function(list){
+    if(/^https?:\/\//i.test(target) && target.indexOf(self.location.origin)!==0) return clients.openWindow(target);
+    var absolute=new URL(target,self.location.origin).href;
+    for(var i=0;i<list.length;i++){
+      if("focus" in list[i]){ if("navigate" in list[i]) return list[i].navigate(absolute).then(function(c){return c.focus();}); return list[i].focus(); }
+    }
+    return clients.openWindow?clients.openWindow(absolute):null;
+  }));
 });
