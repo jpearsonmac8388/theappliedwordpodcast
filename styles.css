@@ -817,3 +817,8 @@ body[data-theme="slate"] .hero-rotator{background:linear-gradient(180deg,rgba(28
 #sheetRange{color:var(--bone);border-color:rgba(228,195,116,.14);white-space:nowrap}
 .v.sel{background:rgba(224,194,122,.13);box-shadow:inset 3px 0 0 var(--brass)}
 @media (max-width:360px){.verse-range-controls button{font-size:7.5px;padding:9px 4px}}
+
+/* v18 verse-card reference match */
+.cardprev canvas{
+  background:#f3e8d7;
+}

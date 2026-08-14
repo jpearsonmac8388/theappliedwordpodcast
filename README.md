@@ -32,12 +32,12 @@ Reader features include:
 - all 66 books and chapter navigation
 - full-Bible word search and direct reference search
 - adjustable reading text size
-- five highlight colors plus clear highlight, including adjacent multi-verse selection
+- five highlight colors plus clear highlight
 - verse notes
 - chapter bookmarks
 - native verse sharing with clipboard fallback
 - verse copying
-- generated social-media verse cards in 9:16, 4:5, and 1:1 with single- or multi-verse selections
+- generated social-media verse cards in 9:16, 4:5, and 1:1
 - recent activity history and a saved-items view
 
 The Berean Bible publisher states that the Berean Bible text was dedicated to the public domain on April 30, 2023. Official source:
@@ -100,8 +100,4 @@ Settings includes an export for marks/bookmarks/activity and reset controls.
 - `manifest.webmanifest` — PWA metadata
 
 
-## Themes
-
-Settings includes Classic leather/gold, Blue Midnight, and Slate themes.
-
-The Devotion hero uses ten lightweight 3:2 images that are preloaded for smooth cycling.
+- v18: verse-card typography tightened to more closely match the supplied Roman-serif reference, with stronger weight, tighter leading, darker ink, and larger safe margins.

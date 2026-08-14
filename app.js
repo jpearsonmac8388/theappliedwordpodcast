@@ -944,7 +944,7 @@ function drawCard(){
     x.quadraticCurveTo(x0,y0,x0+r,y0); x.closePath();
   }
   function seeded(i){ var n=Math.sin(i*12.9898+78.233)*43758.5453; return n-Math.floor(n); }
-  function fontSpec(size){ return "800 "+size+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; }
+  function fontSpec(size){ return "900 "+size+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; }
   function wrappedLines(text,maxW,size){
     x.font=fontSpec(size);
     var words=String(text).trim().split(/\s+/), lines=[], line="";
@@ -972,7 +972,7 @@ function drawCard(){
   roundedRect(inner,inner,W-inner*2,H-inner*2,W*.016); x.strokeStyle="rgba(197,159,91,.72)"; x.lineWidth=Math.max(1.6,W*.0018); x.stroke();
 
   // The logo is anchored from the top using W, so changing aspect ratio never moves or stretches it.
-  var logoW=W*.225, logoH=logoW, logoY=outer+W*.18;
+  var logoW=W*.205, logoH=logoW, logoY=outer+W*.17;
   x.textAlign="center"; x.textBaseline="middle";
   if(cardLogo.complete && cardLogo.naturalWidth){
     x.save(); x.beginPath(); x.arc(W/2,logoY,logoW*.53,0,Math.PI*2); x.closePath();
@@ -981,21 +981,22 @@ function drawCard(){
     x.drawImage(cardLogo,W/2-logoW/2,logoY-logoH/2,logoW,logoH); x.restore();
   }
 
-  var safeX=W*.16, maxW=W-safeX*2;
-  var verseTop=logoY+logoH/2+W*.065;
-  var refY=H-W*.205, footerY=H-W*.092;
-  var verseBottom=refY-W*.095;
+  var safeX=W*.178, maxW=W-safeX*2;
+  var verseText=String(cv.text||"").toUpperCase();
+  var verseTop=logoY+logoH/2+W*.082;
+  var refY=H-W*.195, footerY=H-W*.084;
+  var verseBottom=refY-W*.115;
   var avail=Math.max(W*.25,verseBottom-verseTop);
-  var size=Math.round(W*.052), minSize=Math.round(W*.026), lines=wrappedLines(cv.text,maxW,size);
-  while(lines.length*size*1.24>avail && size>minSize){ size-=2; lines=wrappedLines(cv.text,maxW,size); }
-  var lineH=size*1.24, blockH=lines.length*lineH;
-  var startY=verseTop+(avail-blockH)/2+lineH*.47;
-  x.font=fontSpec(size); x.fillStyle=ink;
+  var size=Math.round(W*.057), minSize=Math.round(W*.029), lines=wrappedLines(verseText,maxW,size);
+  while(lines.length*size*1.12>avail && size>minSize){ size-=2; lines=wrappedLines(verseText,maxW,size); }
+  var lineH=size*1.12, blockH=lines.length*lineH;
+  var startY=verseTop+(avail-blockH)/2+lineH*.455-W*.008;
+  x.font=fontSpec(size); x.fillStyle="#28190f";
   for(var k=0;k<lines.length;k++) x.fillText(lines[k],W/2,startY+k*lineH);
 
   x.strokeStyle="rgba(182,136,64,.72)"; x.lineWidth=Math.max(2,W*.0021);
-  x.beginPath(); x.moveTo(W*.31,refY-W*.04); x.lineTo(W*.69,refY-W*.04); x.stroke();
-  x.fillStyle=goldDeep; x.font="700 "+Math.round(W*.027)+"px 'JetBrains Mono', monospace"; x.fillText(cv.ref.toUpperCase(),W/2,refY);
+  x.beginPath(); x.moveTo(W*.34,refY-W*.042); x.lineTo(W*.66,refY-W*.042); x.stroke();
+  x.fillStyle="#624416"; x.font="800 "+Math.round(W*.024)+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; x.fillText(cv.ref.toUpperCase(),W/2,refY);
   x.fillStyle="rgba(123,90,36,.9)"; x.font="italic "+Math.round(W*.0215)+"px 'Lora', Georgia, serif";
   x.fillText("Sharpening the man through the Message.",W/2,footerY);
 }
