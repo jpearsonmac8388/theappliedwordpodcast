@@ -157,7 +157,18 @@ This remains a static PWA. Browser notification permission lets the app show OS 
 - Cleaned up the M’Cheyne Reading Plan controls and replaced the old track selector with **1 Year** and **6 Month** plans. The 6 Month option combines two consecutive M’Cheyne calendar days per app day.
 - Tightened the reading-reminder time control and replaced the ambiguous View Date box with a centered Reading Date navigator.
 - Increased bottom-navigation icon and label sizes slightly without making the bar bulky.
-- Switched new-episode detection from Spotify Web API credentials to the built-in Anchor/Spotify for Creators RSS feed. Listener UI now only exposes Turn On / Turn Off; the push Worker URL is an owner-side deployment setting in `push-config.js`.
+- v25 previously experimented with RSS-backed true push; this was superseded by the simpler v27 weekly episode reminder.
 - Increased the verse-card logo while preserving border clearance, enlarged the Scripture reference/translation, added a clearer Justin McFadden credit, and increased/raised the tagline.
 - Reworked Prayer Requests into preview cards with category, preview, reminder status, and Mark Answered. Tapping a card opens a dedicated full prayer editor.
 - Replaced the visible Markdown editor workflow with a compact one-line rich-text toolbar supporting bold, italic, underline, heading, bullets, numbering, checklist insertion, quote, undo, and redo.
+
+
+## v26
+- Removed Justin McFadden from generated verse cards.
+- Podcast alert configuration-error handling was improved; v27 then simplified the feature to a reminder-only model.
+
+
+## v27
+- Replaced true podcast push with a simple Monday 6:00 AM Pacific episode reminder.
+- Removed podcast push backend configuration from the app.
+- All other v26 behavior and design are unchanged.

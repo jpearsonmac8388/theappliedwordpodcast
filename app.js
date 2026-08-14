@@ -224,98 +224,39 @@ function notificationPrefs(){
   var p=jget("notificationPrefs",{});
   if(typeof p.podcast!=="boolean") p.podcast=false;
   if(typeof p.lastPodcastKey!=="string") p.lastPodcastKey="";
-  if(typeof p.pushConnected!=="boolean") p.pushConnected=false;
-  if(typeof p.pushServiceUrl!=="string") p.pushServiceUrl="";
   return p;
 }
 function saveNotificationPrefs(p){ jset("notificationPrefs",p||{}); }
-function pushServiceUrl(){
-  var p=notificationPrefs(), configured=(typeof window!=="undefined"&&window.TAW_PUSH_SERVICE_URL)?window.TAW_PUSH_SERVICE_URL:"";
-  var url=String(configured||p.pushServiceUrl||"").trim();
-  return url.replace(/\/+$/g,"");
-}
-function savePushServiceUrl(url){
-  var p=notificationPrefs(); p.pushServiceUrl=String(url||"").trim().replace(/\/+$/g,""); p.pushConnected=false; saveNotificationPrefs(p); return p.pushServiceUrl;
-}
-function pushSupported(){ return !!("serviceWorker" in navigator && "PushManager" in window && typeof Notification!=="undefined"); }
-function urlBase64ToUint8Array(base64String){
-  var padding='='.repeat((4-base64String.length%4)%4);
-  var base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
-  var raw=atob(base64), out=new Uint8Array(raw.length);
-  for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
-  return out;
-}
-function pushFetch(path,opts){
-  var base=pushServiceUrl();
-  if(!base) return Promise.reject(new Error("Push service URL is not configured"));
-  opts=opts||{}; opts.headers=Object.assign({"Content-Type":"application/json"},opts.headers||{});
-  return fetch(base+path,opts).then(function(r){
-    if(!r.ok) return r.text().then(function(t){ throw new Error(t||("Push service error "+r.status)); });
-    return r.json();
-  });
-}
-function pushConnectionLabel(){
+function episodeReminderLabel(){
   var p=notificationPrefs();
-  if(!pushSupported()) return "Push is not supported on this browser";
-  if(!pushServiceUrl()) return "Push service is not deployed for this build";
-  return p.pushConnected?"New episode alerts are on":"Ready to turn on";
+  if(!canNotify()) return "Notifications are not supported on this browser";
+  if(typeof Notification!=="undefined" && Notification.permission==="denied") return "Notifications are blocked in browser settings";
+  return p.podcast ? "Mondays at 6:00 AM Pacific" : "Off";
 }
-function connectPushService(){
-  if(!pushServiceUrl()) return Promise.reject(new Error("Podcast push is not configured in this build"));
-  if(!pushSupported()) return Promise.reject(new Error("Push notifications are not supported in this browser"));
+function enablePodcastReminder(){
   return ensureNotificationPermission().then(function(permission){
-    if(permission!=="granted") throw new Error("Notification permission was not granted");
-    return Promise.all([navigator.serviceWorker.ready,pushFetch("/config")]);
-  }).then(function(parts){
-    var reg=parts[0], config=parts[1];
-    if(!config.publicKey) throw new Error("The push service is missing its VAPID public key");
-    return reg.pushManager.getSubscription().then(function(sub){
-      if(sub) return sub;
-      return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(config.publicKey)});
-    });
-  }).then(function(sub){
-    var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
-    return pushFetch("/subscribe",{method:"POST",body:JSON.stringify({subscription:payload,preferences:Object.assign(pushReadingPreferences(),{podcast:true})})}).then(function(){ return sub; });
-  }).then(function(){
-    var p=notificationPrefs(); p.podcast=true; p.pushConnected=true; saveNotificationPrefs(p);
-    return loadLatestEpisode(true).catch(function(){}).then(function(){ return true; });
+    if(permission!=="granted") throw new Error(permission==="denied"?"Notifications are blocked in browser settings":"Notification permission was not granted");
+    var p=notificationPrefs();
+    p.podcast=true;
+    p.lastPodcastKey="";
+    saveNotificationPrefs(p);
+    checkPodcastReleaseReminder(new Date());
+    return true;
   });
 }
-function disconnectPushService(){
-  var base=pushServiceUrl(), existing=null;
-  if(!("serviceWorker" in navigator)) return Promise.resolve(false);
-  return navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager?reg.pushManager.getSubscription():null; }).then(function(sub){
-    existing=sub;
-    if(!sub) return null;
-    var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
-    if(!base) return null;
-    return fetch(base+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:payload.endpoint})}).catch(function(){});
-  }).then(function(){ return existing?existing.unsubscribe():false; }).catch(function(){ return false; }).then(function(){
-    var p=notificationPrefs(); p.podcast=false; p.pushConnected=false; saveNotificationPrefs(p); return true;
-  });
-}
-function loadLatestEpisode(force){
-  if(!pushServiceUrl()) return Promise.reject(new Error("Podcast push is not configured in this build"));
-  if(!force && state.latestEpisode && Date.now()-(state.latestEpisodeFetched||0)<300000) return Promise.resolve(state.latestEpisode);
-  return pushFetch("/latest").then(function(data){
-    state.latestEpisode=data.episode||null; state.latestEpisodeFetched=Date.now();
-    if(state.tab==="podcast") render();
-    return state.latestEpisode;
-  });
+function disablePodcastReminder(){
+  var p=notificationPrefs();
+  p.podcast=false;
+  p.lastPodcastKey="";
+  saveNotificationPrefs(p);
+  return Promise.resolve(true);
 }
 function pushReadingPreferences(){
   var s=planSettings();
   var tz="UTC"; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"; }catch(e){}
   return {podcast:!!notificationPrefs().podcast,readingReminder:{enabled:!!s.reminderEnabled,time:s.reminderTime||"07:00",startDate:s.startDate||"",duration:s.duration||"year",timezone:tz}};
 }
-function syncPushPreferences(){
-  var prefs=notificationPrefs(); if(!prefs.pushConnected || !pushServiceUrl() || !("serviceWorker" in navigator)) return Promise.resolve(false);
-  return navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(sub){
-    if(!sub) return false;
-    var payload=typeof sub.toJSON==="function"?sub.toJSON():sub;
-    return pushFetch("/preferences",{method:"POST",body:JSON.stringify({endpoint:payload.endpoint,preferences:pushReadingPreferences()})}).then(function(){return true;});
-  }).catch(function(){ return false; });
-}
+function syncPushPreferences(){ return Promise.resolve(false); }
 
 function defaultPlanSettings(){
   var y=new Date().getFullYear();
@@ -370,7 +311,6 @@ function planProgressStats(){
   return {days:completed,readings:readings,totalDays:totalDays,totalReadings:mcheyneDays().length*4};
 }
 function checkPlanReminder(now){
-  var prefs=notificationPrefs(); if(prefs.pushConnected) return;
   var s=planSettings(); if(!s.reminderEnabled) return;
   now=now||new Date(); var key=dateKeyLocal(now); if(s.lastReminderKey===key) return;
   if(now.getHours()*60+now.getMinutes()<timeMinutes(s.reminderTime)) return;
@@ -610,7 +550,7 @@ function podcastReleaseKey(now){
   return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());
 }
 function checkPodcastReleaseReminder(now){
-  var prefs=notificationPrefs(); if(!prefs.podcast || prefs.pushConnected) return;
+  var prefs=notificationPrefs(); if(!prefs.podcast) return;
   var key=podcastReleaseKey(now||new Date());
   if(!key||prefs.lastPodcastKey===key) return;
   prefs.lastPodcastKey=key; saveNotificationPrefs(prefs);
@@ -1140,10 +1080,8 @@ function parseSpurgeon(html){
    PODCAST
    ============================================================ */
 function podcastView(){
-  var prefs=notificationPrefs(), latest=state.latestEpisode;
-  if(pushServiceUrl() && (!latest || Date.now()-(state.latestEpisodeFetched||0)>300000)) setTimeout(function(){ loadLatestEpisode(false).catch(function(){}); },0);
-  var latestHTML=latest?'<a class="latest-episode-card" href="'+esc(latest.url||SHOW_URL)+'" target="_blank" rel="noopener" data-podact="episode"><span class="content-kicker">LATEST EPISODE</span><b>'+esc(latest.name||'Latest episode')+'</b><small>'+esc(latest.release_date||'')+(latest.duration_ms?' · '+Math.round(latest.duration_ms/60000)+' MIN':'')+'</small><span class="latest-open">LISTEN ›</span></a>':'';
-  var pushLabel=prefs.pushConnected?'ON':'TURN ON';
+  var prefs=notificationPrefs();
+  var reminderLabel=prefs.podcast?'ON':'TURN ON';
   return '<div class="pad podcast-page">'+
     screenHead("Podcast","Listen to the latest weekly devotional")+
     '<div class="podcast-showcase">'+
@@ -1153,11 +1091,11 @@ function podcastView(){
         '<div class="podcast-title-lg">Sharpening the man through the Message.</div>'+
         '<p class="muted">Play the show right here, or jump out to Spotify and listen there.</p>'+
       '</div>'+
-    '</div>'+latestHTML+
+    '</div>'+
     '<div id="player"><iframe src="'+EMBED_URL+'" title="The Applied Word Podcast on Spotify" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div>'+
     '<a class="cta spotify-link" href="'+SHOW_URL+'" target="_blank" rel="noopener" data-podact="open">OPEN IN SPOTIFY</a>'+
-    '<div class="podcast-alert-card"><div><span class="content-kicker">NEW EPISODE PUSH</span><b>New episode alerts</b><small>'+esc(pushConnectionLabel())+'</small></div><button class="'+(prefs.pushConnected?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+pushLabel+'</button></div>'+
-    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div><p class="muted">The app watches the podcast RSS feed for a new episode and can send a push notification even when the installed app is closed.</p></div>'+
+    '<div class="podcast-alert-card"><div><span class="content-kicker">EPISODE REMINDER</span><b>Monday episode reminder</b><small>'+esc(episodeReminderLabel())+'</small></div><button class="'+(prefs.podcast?'secondary-btn':'primary-btn')+' compact" data-podcastnotify="1">'+reminderLabel+'</button></div>'+
+    '<div class="content-card helper-card listen-anywhere square-card"><div class="content-kicker">LISTEN ANYWHERE</div><p class="muted">Turn on the episode reminder and the app will remind you after 6:00 AM Pacific each Monday to check for the new episode.</p></div>'+
     '<div class="foot">THE APPLIED WORD PODCAST · WEEKLY DEVOTIONAL FOR MEN</div></div>';
 }
 
@@ -1768,8 +1706,6 @@ function drawCard(){
   x.strokeStyle="rgba(182,136,64,.72)"; x.lineWidth=Math.max(2,W*.0021);
   x.beginPath(); x.moveTo(W*.34,refY-W*.042); x.lineTo(W*.66,refY-W*.042); x.stroke();
   x.fillStyle="#624416"; x.font="800 "+Math.round(W*.027)+"px 'Cinzel', 'Roboto Slab', Georgia, serif"; x.fillText((cv.ref+" · "+(cv.abbr||"BSB")).toUpperCase(),W/2,refY);
-  x.fillStyle="rgba(96,67,31,.94)"; x.font="800 "+Math.round(W*.0225)+"px 'Cinzel', 'Roboto Slab', Georgia, serif";
-  x.fillText("JUSTIN MCFADDEN",W/2,authorY);
   x.fillStyle="rgba(123,90,36,.9)"; x.font="italic "+Math.round(W*.0245)+"px 'Lora', Georgia, serif";
   x.fillText("Sharpening the man through the Message.",W/2,footerY);
 }
@@ -1843,8 +1779,8 @@ function settingsView(){
     '<div class="settings-legal">ASV and YLT are public domain. The KJV is public domain in the United States; special Crown rights can apply to publication in the United Kingdom.</div>'+
     '<div class="grouphd settings-section-head">NOTIFICATIONS</div>'+
     '<div class="setrow"><div><div class="lbl">App notifications</div><div class="sub">'+(notificationStatus()==="granted"?"Enabled":notificationStatus()==="denied"?"Blocked in browser settings":notificationStatus()==="unsupported"?"Not supported on this browser":"Permission not granted")+'</div></div><button class="mini" data-notifyenable="1">ENABLE</button></div>'+
-    '<div class="setrow"><div><div class="lbl">New podcast episodes</div><div class="sub">'+esc(pushConnectionLabel())+'</div></div><button class="mini" data-podcastnotify="1">'+(nprefs.pushConnected?"TURN OFF":"TURN ON")+'</button></div>'+
-    '<div class="settings-legal">Episode detection uses The Applied Word podcast RSS feed in the background. End users only need to turn alerts on; no Spotify login or feed setup is required.</div>'+
+    '<div class="setrow"><div><div class="lbl">Monday episode reminder</div><div class="sub">'+esc(episodeReminderLabel())+'</div></div><button class="mini" data-podcastnotify="1">'+(nprefs.podcast?"TURN OFF":"TURN ON")+'</button></div>'+
+    '<div class="settings-legal">A simple weekly reminder for the Monday 6:00 AM Pacific episode release. No podcast service or account connection is required.</div>'+
     '<div class="grouphd settings-section-head">READING PLAN</div>'+
     '<div class="setrow"><div><div class="lbl">M’Cheyne progress</div><div class="sub">'+planProgressStats().days+' days completed · starts '+esc(planSettings().startDate)+' · '+esc(planDurationLabel(planSettings().duration))+'</div></div><button class="mini danger" data-planreset="1">RESET PLAN</button></div>'+
     '<div class="grouphd settings-section-head">YOUR DATA</div>'+
@@ -2143,8 +2079,8 @@ function wire(scr){
   on(scr,"[data-podcastnotify]",function(b){
     b.onclick=function(){
       var prefs=notificationPrefs();
-      if(prefs.pushConnected){ disconnectPushService().then(function(){ toast("New episode alerts are off"); render(); }); return; }
-      connectPushService().then(function(){ toast("New episode alerts are on"); render(); }).catch(function(err){ toast(err.message||"Could not turn on episode alerts"); render(); });
+      if(prefs.podcast){ disablePodcastReminder().then(function(){ toast("Episode reminder is off"); render(); }); return; }
+      enablePodcastReminder().then(function(){ toast("Episode reminder is on"); render(); }).catch(function(err){ toast(err.message||"Could not turn on the episode reminder"); render(); });
     };
   });
   on(scr,"[data-clearhistory]",function(b){
@@ -2262,12 +2198,10 @@ function wire(scr){
   on(scr,"[data-wipe]",function(b){
     b.onclick=function(){
       if(b.dataset.armed){
-        var disconnectPromise=notificationPrefs().pushConnected?disconnectPushService():Promise.resolve(false);
-        disconnectPromise.catch(function(){}).then(function(){
-          jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("mcheynePlanSettings",defaultPlanSettings()); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:"",pushConnected:false,pushServiceUrl:""});
-          ls("streak","0"); ls("lastWalk","");
-          return Promise.all(TIERS.filter(function(t){return t.available;}).map(function(t){ return removeTier(t.id); }));
-        }).then(function(){ state.meta={}; state.loaded={}; state.tab="devotion"; toast("Everything cleared"); render(); });
+        jset("marks",{}); jset("bookmarks",[]); jset("verseBookmarks",[]); jset("verseCategories",[]); jset("plandone",{}); jset("mcheynePlanSettings",defaultPlanSettings()); jset("activity",[]); jset("noteLibrary",{docs:{sermon:[],study:[],men:[]},prayers:[]}); jset("sectionNotes",{}); jset("notificationPrefs",{podcast:false,lastPodcastKey:""});
+        ls("streak","0"); ls("lastWalk","");
+        Promise.all(TIERS.filter(function(t){return t.available;}).map(function(t){ return removeTier(t.id); }))
+          .then(function(){ state.meta={}; state.loaded={}; state.tab="devotion"; toast("Everything cleared"); render(); });
       } else {
         b.dataset.armed="1"; b.textContent="TAP AGAIN TO CONFIRM";
       }
@@ -2564,7 +2498,6 @@ refreshMeta()
   .then(function(){ render(); });
 
 render();
-if(pushServiceUrl()) setTimeout(function(){ loadLatestEpisode(false).catch(function(){}); },2200);
 
 setTimeout(checkLocalReminders,1800);
 setInterval(checkLocalReminders,60000);
